@@ -4,8 +4,9 @@ A mobile-first [Streamlit](https://streamlit.io) app for a 16-player family swee
 the 48-team FIFA World Cup 2026. Each player owns 3 teams drawn at random; the app syncs live
 results from a free public feed and lays them out like a printed wall chart.
 
-> 💷 £3 to enter · £48 pot — 🥇 £24 · 🥈 £12 · 🥉 £6 (to the team's owner) ·
-> 👟 Golden Boot £6 (to the player whose 3 teams score the most combined goals)
+> 💷 £3 to enter · £48 pot — 🥇 £21 · 🥈 £12 · 🥉 £6 (to the team's owner) ·
+> 👟 Golden Boot £6 (player with the most combined goals) ·
+> 🥄 £3 back (player with the fewest, split if tied)
 
 ## What you'll see
 Three mobile-first tabs:
