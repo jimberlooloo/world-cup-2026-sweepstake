@@ -33,6 +33,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Trim Streamlit's generous default top padding (96px) so the header sits higher on a phone.
+st.markdown(
+    "<style>[data-testid='stMainBlockContainer']{padding-top:2.5rem;}</style>",
+    unsafe_allow_html=True,
+)
+
 
 # --------------------------------------------------------------------------- data
 
@@ -85,15 +91,14 @@ def gate() -> bool:
 
 def header(b: dict) -> None:
     st.title("🏆 World Cup 2026")
-    st.caption("Family Sweepstake")
-    left, right = st.columns([3, 1])
+    left, right = st.columns([3, 1], vertical_alignment="center")
     with left:
         st.markdown(
             f"**{b['played']}/{b['total']}** matches played · "
             f"synced live from [openfootball](https://github.com/openfootball/worldcup.json)"
         )
     with right:
-        if st.button("🔄 Refresh", width="stretch"):
+        if st.button("🔄 Refresh"):
             st.cache_data.clear()
             st.rerun()
     if not b["is_real"]:
