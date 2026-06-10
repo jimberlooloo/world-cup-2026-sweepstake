@@ -20,10 +20,11 @@ import wallchart  # noqa: E402
 
 POT = 48
 PRIZES = [
-    ("🥇", "Winner — owner of the team that lifts the cup", 24),
+    ("🥇", "Winner — owner of the team that lifts the cup", 21),
     ("🥈", "Runner-up — owner of the losing finalist", 12),
     ("🥉", "Third place — owner of the third-place team", 6),
     ("👟", "Golden Boot — player whose 3 teams score the most", 6),
+    ("🥄", "Wooden spoon — fewest combined goals gets their £3 back (split if tied)", 3),
 ]
 
 st.set_page_config(
@@ -129,9 +130,11 @@ PLAYERS_CSS = """
 .pcard { border:1px solid #2a2a33; border-radius:12px; background:#15151c;
          overflow:hidden; margin-bottom:10px; }
 .pcard.gb { border-color:#ffd84d80; }
+.pcard.ws { border-color:#74747f80; }
 .pc-h { display:flex; justify-content:space-between; align-items:center;
         padding:9px 14px; background:#1c1c26; }
 .pcard.gb .pc-h { background:#ffd84d1a; }
+.pcard.ws .pc-h { background:#74747f1f; }
 .pc-h .nm { font-weight:800; font-size:15px; color:#fff; }
 .pc-h .tot { font-weight:800; font-size:18px; color:#ffd84d; white-space:nowrap; }
 .pc-row { display:grid; grid-template-columns:24px 1fr auto auto; gap:8px;
@@ -158,7 +161,7 @@ def _status_dot(s: dict | None) -> str:
 
 
 def _player_card(rank: int, player: str, teams: list[str], total: int,
-                 leader: bool, b: dict) -> str:
+                 leader: bool, b: dict, spoon: bool = False) -> str:
     goals, status, flags = b["goals"], b["status"], b["flags"]
     rows = []
     for t in sorted(teams, key=lambda x: goals.get(x, 0), reverse=True):
@@ -168,8 +171,8 @@ def _player_card(rank: int, player: str, teams: list[str], total: int,
             f'<span class="st">{_status_dot(status.get(t))}</span>'
             f'<span class="g">{goals.get(t,0)} ⚽</span></div>'
         )
-    badge = " 👟" if leader else ""
-    cls = "pcard gb" if leader else "pcard"
+    badge = " 👟" if leader else (" 🥄" if spoon else "")
+    cls = "pcard gb" if leader else ("pcard ws" if spoon else "pcard")
     return (
         f'<div class="{cls}"><div class="pc-h">'
         f'<span class="nm">{rank}. {html.escape(str(player))}{badge}</span>'
@@ -188,6 +191,16 @@ def render_players(b: dict) -> None:
     top = standings[0][2] if standings else 0
     leaders = {p for p, _, tot in standings if tot == top and top > 0}
 
+    # Wooden spoon (£3 back) — only flagged once every group game is played, so we don't
+    # brand someone "last" while the table is still mostly zeros. Ties share the spoon.
+    fixtures = b.get("fixtures", {})
+    group_done = bool(fixtures) and all(
+        f["score"] is not None for fs in fixtures.values() for f in fs
+    )
+    bottom = standings[-1][2] if standings else 0
+    spoons = {p for p, _, tot in standings if tot == bottom} if group_done else set()
+    spoons -= leaders  # if everyone's level, don't spoon the leaders too
+
     st.subheader("👟 Golden Boot")
     if top == 0:
         st.info("No goals yet — back once the action kicks off!", icon="⚽")
@@ -195,13 +208,18 @@ def render_players(b: dict) -> None:
         st.success(f"Leading on **{top}** goals: {', '.join(sorted(leaders))}", icon="👟")
 
     cards = [
-        _player_card(rank, p, ts, tot, p in leaders, b)
+        _player_card(rank, p, ts, tot, p in leaders, b, spoon=p in spoons)
         for rank, (p, ts, tot) in enumerate(standings, 1)
     ]
+    legend = (
+        "🟢 in the knockouts · ⚪ group stage · 🔴 knocked out · "
+        "⚽ = each team's tournament goals"
+    )
+    if spoons:
+        legend += " · 🥄 fewest goals (£3 back)"
     st.markdown(
         PLAYERS_CSS + '<div class="pl">' + "".join(cards)
-        + '<div class="pl-legend">🟢 in the knockouts · ⚪ group stage · '
-        "🔴 knocked out · ⚽ = each team's tournament goals</div></div>",
+        + f'<div class="pl-legend">{legend}</div></div>',
         unsafe_allow_html=True,
     )
 
