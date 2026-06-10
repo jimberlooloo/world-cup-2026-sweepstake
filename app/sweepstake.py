@@ -70,7 +70,8 @@ def gate() -> bool:
     st.title("🏆 World Cup 2026 Sweepstake")
     st.caption("Family members — enter the password to view.")
     entered = st.text_input("Password", type="password", label_visibility="collapsed")
-    if entered == password:
+    # Trim surrounding whitespace — mobile keyboards often append a trailing space.
+    if entered.strip() == str(password).strip():
         st.session_state["authed"] = True
         st.rerun()
     elif entered:
