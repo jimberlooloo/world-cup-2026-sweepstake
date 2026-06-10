@@ -14,6 +14,8 @@ On-pitch goals = et if present else ft (a penalty shootout `p` is NOT goals scor
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import requests
 
 BASE = "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026"
@@ -66,6 +68,51 @@ def is_played(match: dict) -> bool:
 
 def _is_group(match: dict) -> bool:
     return bool(match.get("group"))
+
+
+def _uk_kickoff(date: str, time: str) -> datetime | None:
+    """Feed kickoff (e.g. date '2026-06-11', time '13:00 UTC-6') -> UK local datetime.
+
+    The whole tournament (11 Jun – 19 Jul 2026) falls in British Summer Time, so UK time
+    is a fixed UTC+1 throughout — no tz database needed. Returns None if unparseable.
+    """
+    if not date or not time or "UTC" not in time:
+        return None
+    try:
+        hm, off = time.split("UTC")
+        local = datetime.strptime(f"{date} {hm.strip()}", "%Y-%m-%d %H:%M")
+        return local - timedelta(hours=int(off.strip())) + timedelta(hours=1)  # ->UTC ->BST
+    except (ValueError, TypeError):
+        return None
+
+
+def group_fixtures(matches: list[dict]) -> dict[str, list[dict]]:
+    """Per group letter: the 6 fixtures in kickoff order, each with UK date/time + score.
+
+    Mirrors a printed wall chart's group columns; the score is None until the match is
+    played, at which point the on-pitch result fills in.
+    """
+    out: dict[str, list[dict]] = {}
+    for m in matches:
+        if not _is_group(m):
+            continue
+        letter = m["group"].replace("Group ", "").strip()
+        ko = _uk_kickoff(m.get("date", ""), m.get("time", ""))
+        out.setdefault(letter, []).append(
+            {
+                "team1": m["team1"],
+                "team2": m["team2"],
+                "score": _on_pitch(m.get("score")),
+                "day": f"{ko.strftime('%a')} {ko.day} {ko.strftime('%b')}" if ko else "",
+                "time": ko.strftime("%H:%M") if ko else (m.get("time", "") or ""),
+                "_sort": ko or datetime.max,
+            }
+        )
+    for fixtures in out.values():
+        fixtures.sort(key=lambda f: f["_sort"])
+        for f in fixtures:
+            f.pop("_sort", None)
+    return out
 
 
 # --------------------------------------------------------------------------- goals
@@ -209,6 +256,7 @@ def overall(teams: list[dict], matches: list[dict]) -> dict:
         "goals": team_goals(matches),
         "standings": standings,
         "status": team_status(matches, standings, valid),
+        "fixtures": group_fixtures(matches),
         "played": sum(1 for m in matches if is_played(m)),
         "total": len(matches),
         "_matches": matches,  # raw feed, for the wall-chart bracket
