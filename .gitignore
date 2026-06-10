@@ -1,0 +1,18 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Secrets — real names / allocation live here, NEVER commit
+.streamlit/secrets.toml
+.env
+
+# Local draw inputs/outputs
+names.txt
+allocation.local.toml
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

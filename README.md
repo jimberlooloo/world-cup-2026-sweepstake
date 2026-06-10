@@ -1,0 +1,44 @@
+# 🏆 World Cup 2026 — Family Sweepstake
+
+A mobile-first [Streamlit](https://streamlit.io) app for a 16-player family sweepstake over
+the 48-team FIFA World Cup 2026. Each player owns 3 teams drawn at random; the app syncs live
+results from a free public feed and tracks the **Golden Boot race**. See [SPEC.md](SPEC.md).
+
+> 💷 £3 to enter · £48 pot — 🥇 £24 · 🥈 £12 · 🥉 £6 · 👟 Golden Boot £6 (all to the team's owner)
+
+## How it works
+- **Results** sync on each run from the public-domain
+  [openfootball](https://github.com/openfootball/worldcup.json) JSON feed — **no API key**.
+  Cached 10 minutes; a **Refresh** button forces a re-sync.
+- **Allocation** (who owns which teams) lives in **Streamlit Secrets**, so the repo holds
+  **no real names**. With no secrets set, it shows placeholder Player 1–16.
+
+## Run it locally
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run app/sweepstake.py        # runs out of the box with Player 1–16
+```
+To use real names locally, copy the example secrets and edit (this file is gitignored):
+```bash
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+```
+
+## Do the real draw
+Run the draw with your 16 family names — it prints a ready-to-paste Secrets block:
+```bash
+python draw.py "Alice, Bob, Carol, Dan, Eve, Frank, Grace, Heidi, Ivan, Judy, Mallory, Niaj, Olivia, Peggy, Rupert, Sybil"
+# or:  python draw.py --names-file names.txt
+# add --explicit to emit the fixed mapping instead of names+seed
+```
+The draw is pure luck but **reproducible** from the seed, so it can't be disputed. Paste the
+output into the deployed app's Secrets panel (or `.streamlit/secrets.toml` locally).
+
+## Deploy (Streamlit Community Cloud)
+1. Push this repo to GitHub (public is fine — it has no personal data).
+2. On [share.streamlit.io](https://share.streamlit.io), create an app from the repo with main
+   file `app/sweepstake.py`.
+3. In the app's **Secrets**, paste your `[sweepstake]` block from `draw.py`.
+4. Share the URL with the family — open it on a phone.
+
+_Built spec-first; every change via a reviewed PR._

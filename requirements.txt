@@ -1,0 +1,4 @@
+# App runtime — what Streamlit Community Cloud installs. Lean: live feed, no DB.
+streamlit
+pandas
+requests
