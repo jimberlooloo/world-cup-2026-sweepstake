@@ -1,27 +1,29 @@
 """World Cup 2026 family sweepstake — mobile-first Streamlit app.
 
 Reads the player->team allocation from Streamlit Secrets (no names in the repo) and syncs
-live results from the openfootball feed on each run. Two tabs: Players (cards + Golden Boot
-race) and Planner (the full 48-team sheet). See README.md for an overview.
+live results from the openfootball feed on each run. Three tabs: Players (cards + Golden
+Boot race), Groups (12 group cards) and Knockouts (the bracket, with a round picker).
+See README.md for an overview.
 """
 from __future__ import annotations
 
+import html
 import os
 import sys
 
-import pandas as pd
 import streamlit as st
 
 sys.path.append(os.path.dirname(__file__))
 import allocation as alloc  # noqa: E402
 import data as feed  # noqa: E402
+import wallchart  # noqa: E402
 
 POT = 48
 PRIZES = [
-    ("🥇", "1st place team", 24),
-    ("🥈", "2nd place team", 12),
-    ("🥉", "3rd place team", 6),
-    ("👟", "Golden Boot team (most goals)", 6),
+    ("🥇", "Winner — owner of the team that lifts the cup", 24),
+    ("🥈", "Runner-up — owner of the losing finalist", 12),
+    ("🥉", "Third place — owner of the third-place team", 6),
+    ("👟", "Golden Boot — player whose 3 teams score the most", 6),
 ]
 
 st.set_page_config(
@@ -29,6 +31,22 @@ st.set_page_config(
     page_icon="🏆",
     layout="centered",  # centered reads best on a phone
     initial_sidebar_state="collapsed",
+)
+
+# Trim Streamlit's generous default top padding (96px) so the header sits higher on a phone,
+# and keep the one header column-row (matches count + Refresh) on a single line on mobile
+# rather than letting Streamlit stack it. The header is the app's only st.columns row.
+st.markdown(
+    "<style>"
+    "[data-testid='stMainBlockContainer']{padding-top:2.5rem;}"
+    "[data-testid='stMainBlockContainer'] h1"
+    "{font-size:2rem;line-height:1.2;white-space:nowrap;padding:0 0 .3rem;}"
+    "[data-testid='stHorizontalBlock']{flex-wrap:nowrap;align-items:center;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']{min-width:0;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:last-child"
+    "{display:flex;justify-content:flex-end;}"
+    "</style>",
+    unsafe_allow_html=True,
 )
 
 
@@ -81,29 +99,13 @@ def gate() -> bool:
 
 # ------------------------------------------------------------------------- render
 
-def status_chip(s: dict | None) -> str:
-    if not s:
-        return "⚪ —"
-    alive = s.get("alive")
-    label = s.get("label", "")
-    if alive is False:
-        return f"🔴 {label or 'out'}"
-    if s.get("phase") == "ko":
-        return f"🟢 {label or 'in knockouts'}"
-    return f"⚪ {label or 'group stage'}"
-
-
 def header(b: dict) -> None:
     st.title("🏆 World Cup 2026")
-    st.caption("Family Sweepstake")
-    left, right = st.columns([3, 1])
+    left, right = st.columns([2, 1], vertical_alignment="center")
     with left:
-        st.markdown(
-            f"**{b['played']}/{b['total']}** matches played · "
-            f"synced live from [openfootball](https://github.com/openfootball/worldcup.json)"
-        )
+        st.markdown(f"**{b['played']}/{b['total']}** matches played")
     with right:
-        if st.button("🔄 Refresh", width="stretch"):
+        if st.button("🔄 Refresh"):
             st.cache_data.clear()
             st.rerun()
     if not b["is_real"]:
@@ -112,100 +114,114 @@ def header(b: dict) -> None:
     with st.expander("💷 £3 to enter · £48 pot · prizes"):
         st.markdown(
             "🎲 3 teams each, drawn at random — no picking, pure luck of the draw.\n\n"
-            "👥 16 players sharing all 48 teams. All prizes go to the **owner of the team**:"
+            "👥 16 players sharing all 48 teams:"
         )
         for icon, name, amt in PRIZES:
-            st.markdown(f"- {icon} **{name}** — £{amt}")
+            st.markdown(f"- {icon} **£{amt}** — {name}")
 
 
-def golden_boot_race(b: dict) -> None:
-    goals, owner, flags = b["goals"], b["owner"], b["flags"]
-    ranked = sorted(
-        [(t, goals.get(t, 0)) for t in [x["name"] for x in b["teams"]]],
-        key=lambda x: x[1],
+# Streamlit columns stack vertically on a phone, so the player cards are rendered as
+# inline HTML (like the Groups/Knockouts cards) to keep each team on one tidy row.
+PLAYERS_CSS = """
+<style>
+.pl * { box-sizing: border-box; }
+.pl { font-family: system-ui, sans-serif; }
+.pcard { border:1px solid #2a2a33; border-radius:12px; background:#15151c;
+         overflow:hidden; margin-bottom:10px; }
+.pcard.gb { border-color:#ffd84d80; }
+.pc-h { display:flex; justify-content:space-between; align-items:center;
+        padding:9px 14px; background:#1c1c26; }
+.pcard.gb .pc-h { background:#ffd84d1a; }
+.pc-h .nm { font-weight:800; font-size:15px; color:#fff; }
+.pc-h .tot { font-weight:800; font-size:18px; color:#ffd84d; white-space:nowrap; }
+.pc-row { display:grid; grid-template-columns:24px 1fr auto auto; gap:8px;
+          align-items:center; padding:7px 14px; border-top:1px solid #ffffff10; }
+.pc-row .fl { font-size:17px; }
+.pc-row .tm { color:#e8e8ef; font-weight:600; font-size:14px; line-height:1.2; }
+.pc-row .st { font-size:13px; }
+.pc-row .g { color:#ffd84d; font-weight:700; font-size:14px;
+             min-width:34px; text-align:right; white-space:nowrap; }
+.pl-legend { color:#8a8a96; font-size:11px; margin:2px 2px 0; }
+</style>
+"""
+
+
+def _status_dot(s: dict | None) -> str:
+    """Per-team progress reduced to one colour dot for the combined-goals cards."""
+    if not s:
+        return "⚪"
+    if s.get("alive") is False:
+        return "🔴"
+    if s.get("phase") == "ko":
+        return "🟢"
+    return "⚪"
+
+
+def _player_card(rank: int, player: str, teams: list[str], total: int,
+                 leader: bool, b: dict) -> str:
+    goals, status, flags = b["goals"], b["status"], b["flags"]
+    rows = []
+    for t in sorted(teams, key=lambda x: goals.get(x, 0), reverse=True):
+        rows.append(
+            f'<div class="pc-row"><span class="fl">{flags.get(t,"")}</span>'
+            f'<span class="tm">{html.escape(str(t))}</span>'
+            f'<span class="st">{_status_dot(status.get(t))}</span>'
+            f'<span class="g">{goals.get(t,0)} ⚽</span></div>'
+        )
+    badge = " 👟" if leader else ""
+    cls = "pcard gb" if leader else "pcard"
+    return (
+        f'<div class="{cls}"><div class="pc-h">'
+        f'<span class="nm">{rank}. {html.escape(str(player))}{badge}</span>'
+        f'<span class="tot">{total} ⚽</span></div>'
+        + "".join(rows) + "</div>"
+    )
+
+
+def render_players(b: dict) -> None:
+    goals = b["goals"]
+    standings = sorted(
+        ((p, ts, sum(goals.get(t, 0) for t in ts)) for p, ts in b["allocation"].items()),
+        key=lambda x: x[2],
         reverse=True,
     )
-    top_goals = ranked[0][1] if ranked else 0
-    st.subheader("👟 Golden Boot race")
-    if top_goals == 0:
-        st.caption("No goals yet — back tomorrow once the action kicks off!")
-    else:
-        leaders = [t for t, g in ranked if g == top_goals]
-        who = ", ".join(f"{flags.get(t,'')} {t} ({owner.get(t,'?')})" for t in leaders)
-        st.success(f"Leading on **{top_goals}** goals: {who}", icon="👟")
+    top = standings[0][2] if standings else 0
+    leaders = {p for p, _, tot in standings if tot == top and top > 0}
 
-    rows = [
-        {
-            "": flags.get(t, ""),
-            "Team": t,
-            "⚽": g,
-            "Owner": owner.get(t, "—"),
-        }
-        for t, g in ranked[:12]
+    st.subheader("👟 Golden Boot")
+    if top == 0:
+        st.info("No goals yet — back once the action kicks off!", icon="⚽")
+    else:
+        st.success(f"Leading on **{top}** goals: {', '.join(sorted(leaders))}", icon="👟")
+
+    cards = [
+        _player_card(rank, p, ts, tot, p in leaders, b)
+        for rank, (p, ts, tot) in enumerate(standings, 1)
     ]
-    st.dataframe(
-        pd.DataFrame(rows),
-        hide_index=True,
-        width="stretch",
-        column_config={"⚽": st.column_config.NumberColumn(width="small")},
+    st.markdown(
+        PLAYERS_CSS + '<div class="pl">' + "".join(cards)
+        + '<div class="pl-legend">🟢 in the knockouts · ⚪ group stage · '
+        "🔴 knocked out · ⚽ = each team's tournament goals</div></div>",
+        unsafe_allow_html=True,
     )
 
 
-def player_cards(b: dict) -> None:
-    goals, status, flags = b["goals"], b["status"], b["flags"]
-    standings = []
-    for player, teams in b["allocation"].items():
-        total = sum(goals.get(t, 0) for t in teams)
-        standings.append((player, teams, total))
-    standings.sort(key=lambda x: x[2], reverse=True)
+def knockouts(b: dict) -> None:
+    """Knockout bracket with a single-line round picker (pills) — phone-friendly nav.
 
-    st.subheader("👥 Players — combined goals")
-    st.caption("Ranked by their three teams' total goals so far.")
-    for rank, (player, teams, total) in enumerate(standings, 1):
-        with st.container(border=True):
-            top = st.columns([3, 1])
-            top[0].markdown(f"**{rank}. {player}**")
-            top[1].markdown(f"### {total} ⚽")
-            for t in sorted(teams, key=lambda x: goals.get(x, 0), reverse=True):
-                c = st.columns([3, 1, 3])
-                c[0].markdown(f"{flags.get(t,'')} **{t}**")
-                c[1].markdown(f"{goals.get(t,0)} ⚽")
-                c[2].caption(status_chip(status.get(t)))
-
-
-def planner(b: dict) -> None:
-    goals, owner, status, flags = b["goals"], b["owner"], b["status"], b["flags"]
-    st.subheader("📋 The planner — all 48 teams")
-    rows = []
-    for t in b["teams"]:
-        name = t["name"]
-        s = status.get(name)
-        rows.append(
-            {
-                "": flags.get(name, ""),
-                "Country": name,
-                "Grp": t.get("group", ""),
-                "Owner": owner.get(name, "—"),
-                "⚽": goals.get(name, 0),
-                "Status": status_chip(s),
-            }
-        )
-    df = pd.DataFrame(rows).sort_values(["Owner", "Country"], kind="stable")
-    st.dataframe(df, hide_index=True, width="stretch", height=560)
-
-    with st.expander("📊 Group standings"):
-        for group, table in sorted(b["standings"].items()):
-            st.markdown(f"**{group}**")
-            srows = [
-                {
-                    "": flags.get(r["team"], ""),
-                    "Team": r["team"],
-                    "P": r["p"], "W": r["w"], "D": r["d"], "L": r["l"],
-                    "GD": r["gd"], "Pts": r["pts"], "Owner": owner.get(r["team"], "—"),
-                }
-                for r in table
-            ]
-            st.dataframe(pd.DataFrame(srows), hide_index=True, width="stretch")
+    Defaults to the live round; one round shown at a time so the pills fit on one row.
+    """
+    picks = wallchart.ROUND_PICKS  # [(short label, feed round key), ...]
+    by_short = dict(picks)
+    options = [short for short, _ in picks]
+    default = next(
+        (short for short, key in picks if key == wallchart.default_round_key(b)),
+        options[0],
+    )
+    choice = st.pills(
+        "round", options, default=default, label_visibility="collapsed"
+    ) or default
+    wallchart.render_bracket(b, rounds=[by_short[choice]], show_headers=False)
 
 
 def main() -> None:
@@ -219,13 +235,13 @@ def main() -> None:
         return
 
     header(b)
-    tab_players, tab_planner = st.tabs(["🏆 Players", "📋 Planner"])
+    tab_players, tab_groups, tab_ko = st.tabs(["🏆 Players", "🟩 Groups", "🥊 Knockouts"])
     with tab_players:
-        golden_boot_race(b)
-        st.divider()
-        player_cards(b)
-    with tab_planner:
-        planner(b)
+        render_players(b)
+    with tab_groups:
+        wallchart.render_groups(b)
+    with tab_ko:
+        knockouts(b)
 
 
 if __name__ == "__main__":
