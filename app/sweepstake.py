@@ -33,9 +33,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Trim Streamlit's generous default top padding (96px) so the header sits higher on a phone.
+# Trim Streamlit's generous default top padding (96px) so the header sits higher on a phone,
+# and keep the one header column-row (matches count + Refresh) on a single line on mobile
+# rather than letting Streamlit stack it. The header is the app's only st.columns row.
 st.markdown(
-    "<style>[data-testid='stMainBlockContainer']{padding-top:2.5rem;}</style>",
+    "<style>"
+    "[data-testid='stMainBlockContainer']{padding-top:2.5rem;}"
+    "[data-testid='stHorizontalBlock']{flex-wrap:nowrap;align-items:center;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']{min-width:0;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:last-child"
+    "{display:flex;justify-content:flex-end;}"
+    "</style>",
     unsafe_allow_html=True,
 )
 
@@ -91,12 +99,9 @@ def gate() -> bool:
 
 def header(b: dict) -> None:
     st.title("🏆 World Cup 2026")
-    left, right = st.columns([3, 1], vertical_alignment="center")
+    left, right = st.columns([2, 1], vertical_alignment="center")
     with left:
-        st.markdown(
-            f"**{b['played']}/{b['total']}** matches played · "
-            f"synced live from [openfootball](https://github.com/openfootball/worldcup.json)"
-        )
+        st.markdown(f"**{b['played']}/{b['total']}** matches played")
     with right:
         if st.button("🔄 Refresh"):
             st.cache_data.clear()
