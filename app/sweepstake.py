@@ -39,6 +39,8 @@ st.set_page_config(
 st.markdown(
     "<style>"
     "[data-testid='stMainBlockContainer']{padding-top:2.5rem;}"
+    "[data-testid='stMainBlockContainer'] h1"
+    "{font-size:2rem;line-height:1.2;white-space:nowrap;padding:0 0 .3rem;}"
     "[data-testid='stHorizontalBlock']{flex-wrap:nowrap;align-items:center;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']{min-width:0;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:last-child"
@@ -187,7 +189,6 @@ def render_players(b: dict) -> None:
     leaders = {p for p, _, tot in standings if tot == top and top > 0}
 
     st.subheader("👟 Golden Boot")
-    st.caption("£6 to the player whose three teams score the most goals between them.")
     if top == 0:
         st.info("No goals yet — back once the action kicks off!", icon="⚽")
     else:
