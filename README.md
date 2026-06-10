@@ -2,9 +2,19 @@
 
 A mobile-first [Streamlit](https://streamlit.io) app for a 16-player family sweepstake over
 the 48-team FIFA World Cup 2026. Each player owns 3 teams drawn at random; the app syncs live
-results from a free public feed and tracks the **Golden Boot race**.
+results from a free public feed and lays them out like a printed wall chart.
 
-> 💷 £3 to enter · £48 pot — 🥇 £24 · 🥈 £12 · 🥉 £6 · 👟 Golden Boot £6 (all to the team's owner)
+> 💷 £3 to enter · £48 pot — 🥇 £24 · 🥈 £12 · 🥉 £6 (to the team's owner) ·
+> 👟 Golden Boot £6 (to the player whose 3 teams score the most combined goals)
+
+## What you'll see
+Three mobile-first tabs:
+- **🏆 Players** — every player ranked by their three teams' combined goals; the leader holds
+  the **Golden Boot**.
+- **🟩 Groups** — a card per group with all 6 fixtures (UK kickoff times + live scores) and a
+  latest-scores standings, owner names shown against each team.
+- **🥊 Knockouts** — the bracket, one round at a time (Round of 32 → Final) via a round picker.
+  Placeholder slots fill in with the real teams and owners as the feed resolves them.
 
 ## How it works
 - **Results** sync on each run from the public-domain
