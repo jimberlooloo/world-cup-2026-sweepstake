@@ -2,7 +2,7 @@
 
 Reads the player->team allocation from Streamlit Secrets (no names in the repo) and syncs
 live results from the openfootball feed on each run. Two tabs: Players (cards + Golden Boot
-race) and Planner (the full 48-team sheet). See SPEC.md for the contract.
+race) and Planner (the full 48-team sheet). See README.md for an overview.
 """
 from __future__ import annotations
 
@@ -50,6 +50,34 @@ def get_state():
     return bundle
 
 
+# --------------------------------------------------------------------------- gate
+
+def gate() -> bool:
+    """Optional shared-password gate so a public URL doesn't expose family names.
+
+    If `app_password` is set in Streamlit Secrets, visitors must enter it before any
+    names render. With no password configured (e.g. local dev) the app is open.
+    """
+    try:
+        password = st.secrets["app_password"] if "app_password" in st.secrets else None
+    except Exception:
+        password = None
+    if not password:
+        return True
+    if st.session_state.get("authed"):
+        return True
+
+    st.title("🏆 World Cup 2026 Sweepstake")
+    st.caption("Family members — enter the password to view.")
+    entered = st.text_input("Password", type="password", label_visibility="collapsed")
+    if entered == password:
+        st.session_state["authed"] = True
+        st.rerun()
+    elif entered:
+        st.error("Incorrect password.")
+    return False
+
+
 # ------------------------------------------------------------------------- render
 
 def status_chip(s: dict | None) -> str:
@@ -74,7 +102,7 @@ def header(b: dict) -> None:
             f"synced live from [openfootball](https://github.com/openfootball/worldcup.json)"
         )
     with right:
-        if st.button("🔄 Refresh", use_container_width=True):
+        if st.button("🔄 Refresh", width="stretch"):
             st.cache_data.clear()
             st.rerun()
     if not b["is_real"]:
@@ -117,7 +145,7 @@ def golden_boot_race(b: dict) -> None:
     st.dataframe(
         pd.DataFrame(rows),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={"⚽": st.column_config.NumberColumn(width="small")},
     )
 
@@ -162,7 +190,7 @@ def planner(b: dict) -> None:
             }
         )
     df = pd.DataFrame(rows).sort_values(["Owner", "Country"], kind="stable")
-    st.dataframe(df, hide_index=True, use_container_width=True, height=560)
+    st.dataframe(df, hide_index=True, width="stretch", height=560)
 
     with st.expander("📊 Group standings"):
         for group, table in sorted(b["standings"].items()):
@@ -176,10 +204,12 @@ def planner(b: dict) -> None:
                 }
                 for r in table
             ]
-            st.dataframe(pd.DataFrame(srows), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(srows), hide_index=True, width="stretch")
 
 
 def main() -> None:
+    if not gate():
+        return
     try:
         b = get_state()
     except Exception as exc:  # network / feed hiccup — fail friendly on mobile

@@ -2,7 +2,7 @@
 
 A mobile-first [Streamlit](https://streamlit.io) app for a 16-player family sweepstake over
 the 48-team FIFA World Cup 2026. Each player owns 3 teams drawn at random; the app syncs live
-results from a free public feed and tracks the **Golden Boot race**. See [SPEC.md](SPEC.md).
+results from a free public feed and tracks the **Golden Boot race**.
 
 > 💷 £3 to enter · £48 pot — 🥇 £24 · 🥈 £12 · 🥉 £6 · 👟 Golden Boot £6 (all to the team's owner)
 
@@ -12,6 +12,9 @@ results from a free public feed and tracks the **Golden Boot race**. See [SPEC.m
   Cached 10 minutes; a **Refresh** button forces a re-sync.
 - **Allocation** (who owns which teams) lives in **Streamlit Secrets**, so the repo holds
   **no real names**. With no secrets set, it shows placeholder Player 1–16.
+- **Privacy on a public URL:** set `app_password` in Secrets and the app asks for a shared
+  password before any names render — so a public link doesn't expose family names. Omit it to
+  leave the app open.
 
 ## Run it locally
 ```bash
@@ -38,7 +41,6 @@ output into the deployed app's Secrets panel (or `.streamlit/secrets.toml` local
 1. Push this repo to GitHub (public is fine — it has no personal data).
 2. On [share.streamlit.io](https://share.streamlit.io), create an app from the repo with main
    file `app/sweepstake.py`.
-3. In the app's **Secrets**, paste your `[sweepstake]` block from `draw.py`.
-4. Share the URL with the family — open it on a phone.
-
-_Built spec-first; every change via a reviewed PR._
+3. In the app's **Secrets**, paste your `[sweepstake]` block from `draw.py`, and set
+   `app_password` to a shared password.
+4. Share the URL **and** the password with the family — open it on a phone.

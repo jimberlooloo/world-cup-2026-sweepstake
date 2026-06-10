@@ -16,3 +16,6 @@ allocation.local.toml
 .DS_Store
 .vscode/
 .idea/
+
+# Local dev / machine-specific (contains absolute paths)
+.claude/
