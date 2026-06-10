@@ -15,6 +15,7 @@ import streamlit as st
 sys.path.append(os.path.dirname(__file__))
 import allocation as alloc  # noqa: E402
 import data as feed  # noqa: E402
+import wallchart  # noqa: E402
 
 POT = 48
 PRIZES = [
@@ -173,41 +174,6 @@ def player_cards(b: dict) -> None:
                 c[2].caption(status_chip(status.get(t)))
 
 
-def planner(b: dict) -> None:
-    goals, owner, status, flags = b["goals"], b["owner"], b["status"], b["flags"]
-    st.subheader("📋 The planner — all 48 teams")
-    rows = []
-    for t in b["teams"]:
-        name = t["name"]
-        s = status.get(name)
-        rows.append(
-            {
-                "": flags.get(name, ""),
-                "Country": name,
-                "Grp": t.get("group", ""),
-                "Owner": owner.get(name, "—"),
-                "⚽": goals.get(name, 0),
-                "Status": status_chip(s),
-            }
-        )
-    df = pd.DataFrame(rows).sort_values(["Owner", "Country"], kind="stable")
-    st.dataframe(df, hide_index=True, width="stretch", height=560)
-
-    with st.expander("📊 Group standings"):
-        for group, table in sorted(b["standings"].items()):
-            st.markdown(f"**{group}**")
-            srows = [
-                {
-                    "": flags.get(r["team"], ""),
-                    "Team": r["team"],
-                    "P": r["p"], "W": r["w"], "D": r["d"], "L": r["l"],
-                    "GD": r["gd"], "Pts": r["pts"], "Owner": owner.get(r["team"], "—"),
-                }
-                for r in table
-            ]
-            st.dataframe(pd.DataFrame(srows), hide_index=True, width="stretch")
-
-
 def main() -> None:
     if not gate():
         return
@@ -219,13 +185,20 @@ def main() -> None:
         return
 
     header(b)
-    tab_players, tab_planner = st.tabs(["🏆 Players", "📋 Planner"])
+    tab_players, tab_chart = st.tabs(["🏆 Players", "🗓️ Wall chart"])
     with tab_players:
         golden_boot_race(b)
         st.divider()
         player_cards(b)
-    with tab_planner:
-        planner(b)
+    with tab_chart:
+        view = st.segmented_control(
+            "view", ["Groups", "Bracket"], default="Groups",
+            label_visibility="collapsed",
+        )
+        if view == "Bracket":
+            wallchart.render_bracket(b)
+        else:
+            wallchart.render_groups(b)
 
 
 if __name__ == "__main__":

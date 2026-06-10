@@ -211,4 +211,6 @@ def overall(teams: list[dict], matches: list[dict]) -> dict:
         "status": team_status(matches, standings, valid),
         "played": sum(1 for m in matches if is_played(m)),
         "total": len(matches),
+        "_matches": matches,  # raw feed, for the wall-chart bracket
+        "_valid": valid,
     }
