@@ -79,6 +79,11 @@ def gate() -> bool:
 
     If `app_password` is set in Streamlit Secrets, visitors must enter it before any
     names render. With no password configured (e.g. local dev) the app is open.
+
+    The password may also be passed as a `?pw=` URL query param so the family can bookmark
+    a one-tap link. It's left in the URL on purpose: every fresh session (browser refresh,
+    pull-to-refresh, app wake-up) re-reads it and logs straight back in. Fine here since the
+    only thing it guards is family names, not real credentials.
     """
     try:
         password = st.secrets["app_password"] if "app_password" in st.secrets else None
@@ -87,6 +92,12 @@ def gate() -> bool:
     if not password:
         return True
     if st.session_state.get("authed"):
+        return True
+
+    # One-tap link via ?pw= (kept in the URL so reloads stay logged in).
+    qp = st.query_params.get("pw")
+    if qp is not None and str(qp).strip() == str(password).strip():
+        st.session_state["authed"] = True
         return True
 
     st.title("🏆 World Cup 2026 Sweepstake")
