@@ -16,15 +16,17 @@ import streamlit as st
 sys.path.append(os.path.dirname(__file__))
 import allocation as alloc  # noqa: E402
 import data as feed  # noqa: E402
+import trophies  # noqa: E402
 import wallchart  # noqa: E402
 
 POT = 48
 PRIZES = [
-    ("🥇", "Winner — owner of the team that lifts the cup", 21),
-    ("🥈", "Runner-up — owner of the losing finalist", 12),
+    ("🥇", "Winner — owner of the team that lifts the cup", 18),
+    ("🥈", "Runner-up — owner of the second-place team", 9),
     ("🥉", "Third place — owner of the third-place team", 6),
-    ("👟", "Golden Boot — player whose 3 teams score the most", 6),
-    ("🥄", "Wooden spoon — fewest combined goals gets their £3 back (split if tied)", 3),
+    ("👟", "Golden Boot — player whose 3 teams combine for the most goals", 6),
+    ("🌟", "Hall of Fame winner — most fame trophies", 6),
+    ("🙈", "Hall of Shame winner — most shame trophies gets their £3 back!", 3),
 ]
 
 st.set_page_config(
@@ -42,6 +44,7 @@ st.markdown(
     "[data-testid='stMainBlockContainer']{padding-top:2.5rem;}"
     "[data-testid='stMainBlockContainer'] h1"
     "{font-size:2rem;line-height:1.2;white-space:nowrap;padding:0 0 .3rem;}"
+    "[data-baseweb='tab-list']{gap:6px;}"  # fit all 5 tabs across a phone, no swipe
     "[data-testid='stHorizontalBlock']{flex-wrap:nowrap;align-items:center;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']{min-width:0;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:last-child"
@@ -100,6 +103,62 @@ def gate() -> bool:
 
 # ------------------------------------------------------------------------- render
 
+NEXT_CSS = """
+<style>
+.nextm { border:1px solid #1f7a4d; border-radius:12px; background:#0f3d28;
+         padding:9px 14px; margin:2px 0 6px; }
+.nm-when { color:#7fd9a8; font-size:11px; font-weight:700; text-transform:uppercase;
+           letter-spacing:.8px; text-align:center; margin-bottom:6px; }
+.nm-row { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
+.nm-t { font-size:14px; font-weight:700; color:#eafff3; line-height:1.15; }
+.nm-t small { display:block; color:#9fdcbb; font-weight:500; font-size:11px; margin-top:1px; }
+.nm-t1 { text-align:right; }
+.nm-t2 { text-align:left; }
+.nm-fl { font-size:16px; }
+.nm-v { color:#5fae86; font-weight:700; font-size:12px; }
+</style>
+"""
+
+
+def next_match(b: dict) -> None:
+    """Banner for the soonest unplayed match — teams, owners and UK kickoff time."""
+    flags, owner, valid = b["flags"], b["owner"], b["_valid"]
+    upcoming = []
+    for m in b["_matches"]:
+        if feed._on_pitch(m.get("score")) is not None:
+            continue
+        ko = feed._uk_kickoff(m.get("date", ""), m.get("time", ""))
+        if ko is not None:
+            upcoming.append((ko, m))
+    if not upcoming:
+        return  # tournament finished / nothing scheduled
+    ko, m = min(upcoming, key=lambda x: x[0])
+    when = f"{ko.strftime('%a')} {ko.day} {ko.strftime('%b')} · {ko.strftime('%H:%M')}"
+    label = m.get("group") or m.get("round") or ""
+    head = f"⚽ Next up · {label} · {when}" if label else f"⚽ Next up · {when}"
+
+    def side(team: str) -> tuple[str, str, str]:
+        if team in valid:  # real team — show owner; unresolved KO slots stay bare
+            return flags.get(team, ""), html.escape(str(team)), html.escape(owner.get(team, "—"))
+        return "", html.escape(str(team)), ""
+
+    f1, n1, o1 = side(m["team1"])
+    f2, n2, o2 = side(m["team2"])
+    o1h = f"<small>{o1}</small>" if o1 else ""
+    o2h = f"<small>{o2}</small>" if o2 else ""
+    st.markdown(
+        NEXT_CSS
+        + '<div class="nextm">'
+        + f'<div class="nm-when">{html.escape(head)}</div>'
+        + '<div class="nm-row">'
+        + f'<span class="nm-t nm-t1">{n1} <span class="nm-fl">{f1}</span>{o1h}</span>'
+        + '<span class="nm-v">v</span>'
+        + f'<span class="nm-t nm-t2"><span class="nm-fl">{f2}</span> {n2}{o2h}</span>'
+        + "</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def header(b: dict) -> None:
     st.title("🏆 World Cup 2026")
     left, right = st.columns([2, 1], vertical_alignment="center")
@@ -109,6 +168,7 @@ def header(b: dict) -> None:
         if st.button("🔄 Refresh"):
             st.cache_data.clear()
             st.rerun()
+    next_match(b)
     if not b["is_real"]:
         st.info("Demo allocation (Player 1–16). Add real names in Secrets — see README.", icon="ℹ️")
 
@@ -130,11 +190,9 @@ PLAYERS_CSS = """
 .pcard { border:1px solid #2a2a33; border-radius:12px; background:#15151c;
          overflow:hidden; margin-bottom:10px; }
 .pcard.gb { border-color:#ffd84d80; }
-.pcard.ws { border-color:#74747f80; }
 .pc-h { display:flex; justify-content:space-between; align-items:center;
         padding:9px 14px; background:#1c1c26; }
 .pcard.gb .pc-h { background:#ffd84d1a; }
-.pcard.ws .pc-h { background:#74747f1f; }
 .pc-h .nm { font-weight:800; font-size:15px; color:#fff; }
 .pc-h .tot { font-weight:800; font-size:18px; color:#ffd84d; white-space:nowrap; }
 .pc-row { display:grid; grid-template-columns:24px 1fr auto auto; gap:8px;
@@ -161,7 +219,7 @@ def _status_dot(s: dict | None) -> str:
 
 
 def _player_card(rank: int, player: str, teams: list[str], total: int,
-                 leader: bool, b: dict, spoon: bool = False) -> str:
+                 leader: bool, b: dict) -> str:
     goals, status, flags = b["goals"], b["status"], b["flags"]
     rows = []
     for t in sorted(teams, key=lambda x: goals.get(x, 0), reverse=True):
@@ -171,8 +229,8 @@ def _player_card(rank: int, player: str, teams: list[str], total: int,
             f'<span class="st">{_status_dot(status.get(t))}</span>'
             f'<span class="g">{goals.get(t,0)} ⚽</span></div>'
         )
-    badge = " 👟" if leader else (" 🥄" if spoon else "")
-    cls = "pcard gb" if leader else ("pcard ws" if spoon else "pcard")
+    badge = " 👟" if leader else ""
+    cls = "pcard gb" if leader else "pcard"
     return (
         f'<div class="{cls}"><div class="pc-h">'
         f'<span class="nm">{rank}. {html.escape(str(player))}{badge}</span>'
@@ -191,16 +249,6 @@ def render_players(b: dict) -> None:
     top = standings[0][2] if standings else 0
     leaders = {p for p, _, tot in standings if tot == top and top > 0}
 
-    # Wooden spoon (£3 back) — only flagged once every group game is played, so we don't
-    # brand someone "last" while the table is still mostly zeros. Ties share the spoon.
-    fixtures = b.get("fixtures", {})
-    group_done = bool(fixtures) and all(
-        f["score"] is not None for fs in fixtures.values() for f in fs
-    )
-    bottom = standings[-1][2] if standings else 0
-    spoons = {p for p, _, tot in standings if tot == bottom} if group_done else set()
-    spoons -= leaders  # if everyone's level, don't spoon the leaders too
-
     st.subheader("👟 Golden Boot")
     if top == 0:
         st.info("No goals yet — back once the action kicks off!", icon="⚽")
@@ -208,18 +256,13 @@ def render_players(b: dict) -> None:
         st.success(f"Leading on **{top}** goals: {', '.join(sorted(leaders))}", icon="👟")
 
     cards = [
-        _player_card(rank, p, ts, tot, p in leaders, b, spoon=p in spoons)
+        _player_card(rank, p, ts, tot, p in leaders, b)
         for rank, (p, ts, tot) in enumerate(standings, 1)
     ]
-    legend = (
-        "🟢 in the knockouts · ⚪ group stage · 🔴 knocked out · "
-        "⚽ = each team's tournament goals"
-    )
-    if spoons:
-        legend += " · 🥄 fewest goals (£3 back)"
     st.markdown(
         PLAYERS_CSS + '<div class="pl">' + "".join(cards)
-        + f'<div class="pl-legend">{legend}</div></div>',
+        + '<div class="pl-legend">🟢 in the knockouts · ⚪ group stage · '
+        "🔴 knocked out · ⚽ = each team's tournament goals</div></div>",
         unsafe_allow_html=True,
     )
 
@@ -253,13 +296,19 @@ def main() -> None:
         return
 
     header(b)
-    tab_players, tab_groups, tab_ko = st.tabs(["🏆 Players", "🟩 Groups", "🥊 Knockouts"])
+    tab_players, tab_groups, tab_ko, tab_fame, tab_shame = st.tabs(
+        ["🏆 Players", "🟩 Groups", "🥊 Knockouts", "🌟 Fame", "🙈 Shame"]
+    )
     with tab_players:
         render_players(b)
     with tab_groups:
         wallchart.render_groups(b)
     with tab_ko:
         knockouts(b)
+    with tab_fame:
+        trophies.render_fame(b)
+    with tab_shame:
+        trophies.render_shame(b)
 
 
 if __name__ == "__main__":

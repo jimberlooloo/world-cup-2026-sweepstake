@@ -4,18 +4,20 @@ A mobile-first [Streamlit](https://streamlit.io) app for a 16-player family swee
 the 48-team FIFA World Cup 2026. Each player owns 3 teams drawn at random; the app syncs live
 results from a free public feed and lays them out like a printed wall chart.
 
-> 💷 £3 to enter · £48 pot — 🥇 £21 · 🥈 £12 · 🥉 £6 (to the team's owner) ·
-> 👟 Golden Boot £6 (player with the most combined goals) ·
-> 🥄 £3 back (player with the fewest, split if tied)
+> 💷 £3 to enter · £48 pot, all paid out as cash:
+> 🥇 £18 · 🥈 £9 · 🥉 £6 (to the team's owner) · 👟 Golden Boot £6 (most combined goals) ·
+> 🌟 Hall of Fame £6 (most trophies) · 🙈 Hall of Shame £3 (most boobies — your money back)
 
 ## What you'll see
-Three mobile-first tabs:
+Five mobile-first tabs:
 - **🏆 Players** — every player ranked by their three teams' combined goals; the leader holds
   the **Golden Boot**.
 - **🟩 Groups** — a card per group with all 6 fixtures (UK kickoff times + live scores) and a
   latest-scores standings, owner names shown against each team.
 - **🥊 Knockouts** — the bracket, one round at a time (Round of 32 → Final) via a round picker.
   Placeholder slots fill in with the real teams and owners as the feed resolves them.
+- **🌟 Fame** & **🙈 Shame** — auto-awarded fun trophies. Most Hall of Fame trophies wins £6;
+  most Hall of Shame trophies wins the £3 back. All decided live from the feed.
 
 ## How it works
 - **Results** sync on each run from the public-domain
