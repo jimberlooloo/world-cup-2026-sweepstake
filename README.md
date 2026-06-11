@@ -1,8 +1,9 @@
 # 🏆 World Cup 2026 — Family Sweepstake
 
-A mobile-first [Streamlit](https://streamlit.io) app for a 16-player family sweepstake over
-the 48-team FIFA World Cup 2026. Each player owns 3 teams drawn at random; the app syncs live
-results from a free public feed and lays them out like a printed wall chart.
+Follow your three teams through the 48-team FIFA World Cup 2026 — live scores, the Golden Boot
+race, Fame & Shame trophies, and your slice of a £48 prize pot. A mobile-first family
+sweepstake that syncs results automatically and reads like a printed wall chart, built with
+[Streamlit](https://streamlit.io).
 
 > 💷 £3 to enter · £48 pot, all paid out as cash:
 > 🥇 £18 · 🥈 £9 · 🥉 £6 (to the team's owner) · 👟 Golden Boot £6 (most combined goals) ·
