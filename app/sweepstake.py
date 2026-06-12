@@ -258,7 +258,7 @@ def header(b: dict) -> None:
     if not b["is_real"]:
         st.info("Demo allocation (Player 1–16). Add real names in Secrets — see README.", icon="ℹ️")
 
-    with st.expander("💷 Prizes & who's winning"):
+    with st.expander("💷 £48 pot · prizes & leaders"):
         st.markdown(
             "🎲 16 players · 3 random teams each · all 48 shared. Who's leading each prize:"
         )
