@@ -835,7 +835,7 @@ def render_fame(b: dict) -> None:
         top = max(tally.values())
         leaders = sorted(p for p, c in tally.items() if c == top)
         word = "trophy" if top == 1 else "trophies"
-        st.success(f"🌟 **£6** — leading with **{top}** {word}: {', '.join(leaders)}", icon="🌟")
+        st.success(f"**£6** — leading with **{top}** {word}: {', '.join(leaders)}", icon="🌟")
     st.markdown(
         CSS + _standings_html(tally, "Fame trophies", "#ffd84d")
         + '<div class="tr">' + "".join(_card(a, r, flags) for a, r in good) + "</div>",
@@ -857,7 +857,7 @@ def render_shame(b: dict) -> None:
         losers = sorted(p for p, c in tally.items() if c == worst)
         word = "trophy" if worst == 1 else "trophies"
         tail = " — split" if len(losers) > 1 else ""
-        st.warning(f"🥄 **£3 back** — Hall of Shame leader on {worst} shame {word}: "
+        st.warning(f"**£3 back** — Hall of Shame leader on {worst} shame {word}: "
                    f"{', '.join(losers)}{tail}", icon="🥄")
     st.markdown(
         CSS + _standings_html(tally, "Shame trophies", "#d7d7de")
