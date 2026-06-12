@@ -78,6 +78,8 @@ def _overlay_espn(matches: list[dict]) -> None:
         m["goals2"] = ov["goals"].get(t2, [])
         m["cards1"] = ov.get("cards", {}).get(t1, [])
         m["cards2"] = ov.get("cards", {}).get(t2, [])
+        m["pen_misses1"] = ov.get("pen_misses", {}).get(t1, [])
+        m["pen_misses2"] = ov.get("pen_misses", {}).get(t2, [])
 
 
 def team_flag_map(teams: list[dict]) -> dict[str, str]:
