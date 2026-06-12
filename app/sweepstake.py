@@ -273,7 +273,7 @@ def header(b: dict) -> None:
         for icon, name, amt in PRIZES:
             st.markdown(f"- {icon} **£{amt}** — {name}")
 
-    with st.expander("💷 Who's winning — live prize-money leaderboard"):
+    with st.expander("💷 Who's in the money"):
         render_money(b)
 
 
