@@ -801,6 +801,14 @@ def _tally(results: list) -> dict[str, int]:
     return tally
 
 
+def hall_tallies(b: dict) -> tuple[dict, dict]:
+    """(fame_tally, shame_tally) — trophies held per player in each hall. For the Money view."""
+    results = [(a, a["fn"](b)) for a in AWARDS]
+    good = _tally([(a, r) for a, r in results if not a.get("booby")])
+    bad = _tally([(a, r) for a, r in results if a.get("booby")])
+    return good, bad
+
+
 def _standings_html(tally: dict[str, int], label: str, accent: str) -> str:
     """Compact ranked 'who holds how many' list, highest first."""
     if not tally:
@@ -827,7 +835,7 @@ def render_fame(b: dict) -> None:
         top = max(tally.values())
         leaders = sorted(p for p, c in tally.items() if c == top)
         word = "trophy" if top == 1 else "trophies"
-        st.success(f"🌟 **£6** — leading with **{top}** {word}: {', '.join(leaders)}", icon="🌟")
+        st.success(f"**£6** — leading with **{top}** {word}: {', '.join(leaders)}", icon="🌟")
     st.markdown(
         CSS + _standings_html(tally, "Fame trophies", "#ffd84d")
         + '<div class="tr">' + "".join(_card(a, r, flags) for a, r in good) + "</div>",
@@ -840,17 +848,15 @@ def render_shame(b: dict) -> None:
     tally = _tally(shame)
     shame.sort(key=lambda ar: ar[1].get("status") != "won")  # won trophies float to the top
     st.subheader("🙈 Hall of Shame")
-    st.caption("Collect the shame trophies — the most takes the Hall of Shame and gets "
-               "your £3 entry back (split if tied).")
+    st.caption("Win a shame trophy, earn a point — most takes the £3.")
     if not tally:
         st.info("No shame yet — the £3 refund is still anyone's to lose!", icon="🥄")
     else:
         worst = max(tally.values())
         losers = sorted(p for p, c in tally.items() if c == worst)
         word = "trophy" if worst == 1 else "trophies"
-        tail = " — split" if len(losers) > 1 else ""
-        st.warning(f"🥄 **£3 back** — Hall of Shame leader on {worst} shame {word}: "
-                   f"{', '.join(losers)}{tail}", icon="🥄")
+        st.warning(f"**£3 back** — leading with **{worst}** {word}: {', '.join(losers)}",
+                   icon="🥄")
     st.markdown(
         CSS + _standings_html(tally, "Shame trophies", "#d7d7de")
         + '<div class="tr">' + "".join(_card(a, r, flags) for a, r in shame) + "</div>",

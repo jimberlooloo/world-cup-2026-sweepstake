@@ -20,14 +20,6 @@ import trophies  # noqa: E402
 import wallchart  # noqa: E402
 
 POT = 48
-PRIZES = [
-    ("🥇", "Winner — owner of the team that lifts the cup", 18),
-    ("🥈", "Runner-up — owner of the second-place team", 9),
-    ("🥉", "Third place — owner of the third-place team", 6),
-    ("👟", "Golden Boot — player whose 3 teams combine for the most goals", 6),
-    ("🌟", "Hall of Fame winner — most fame trophies", 6),
-    ("🙈", "Hall of Shame winner — most shame trophies gets their £3 back!", 3),
-]
 
 st.set_page_config(
     page_title="World Cup 2026 Sweepstake",
@@ -114,6 +106,89 @@ def gate() -> bool:
 
 # ------------------------------------------------------------------------- render
 
+MONEY_CSS = """
+<style>
+.mny { border:1px solid #1f7a4d; border-radius:12px; background:#0f3d28;
+       overflow:hidden; margin-bottom:10px; }
+.mny-h { background:#16a35a; color:#fff; font-weight:800; font-size:14px;
+         padding:7px 12px; letter-spacing:.3px; }
+.mn-row { padding:7px 12px; border-top:1px solid #1f7a4d33; }
+.mn-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.mn-prize { font-weight:600; color:#eafff3; font-size:14px; }
+.mn-amt { color:#ffd84d; font-weight:800; font-size:14px; white-space:nowrap; }
+.mn-who { color:#9fdcbb; font-size:12px; margin-top:1px; }
+.mn-tbd { color:#5fae86; font-size:12px; font-style:italic; margin-top:1px; }
+.lb { border:1px solid #2a2a33; border-radius:10px; background:#15151c;
+      margin-bottom:10px; overflow:hidden; }
+.lb-h { background:#1c1c26; color:#9090a0; font-size:10px; font-weight:700;
+        text-transform:uppercase; letter-spacing:1px; padding:5px 12px; }
+.lb-row { display:flex; justify-content:space-between; align-items:center;
+          padding:5px 12px; border-top:1px solid #ffffff0d; font-size:13px; }
+.lb-row .lb-nm { color:#e8e8ef; font-weight:600; }
+.lb-row .lb-ct { font-weight:800; }
+</style>
+"""
+
+
+def render_money(b: dict) -> None:
+    """Consolidated 'who's winning' view — current leader of every cash prize plus each
+    player's provisional winnings (ties split the prize; placings stay TBD until decided)."""
+    goals, owner, allocation, status = b["goals"], b["owner"], b["allocation"], b["status"]
+    totals = {p: sum(goals.get(t, 0) for t in ts) for p, ts in allocation.items()}
+    gb_top = max(totals.values(), default=0)
+    gb = sorted(p for p, v in totals.items() if v == gb_top and gb_top > 0)
+
+    fame_tally, shame_tally = trophies.hall_tallies(b)
+
+    def hall_leaders(t: dict) -> list:
+        return sorted(p for p, c in t.items() if c == max(t.values())) if t else []
+
+    def placed(label: str) -> list:
+        return sorted({owner[t] for t, s in status.items()
+                       if (s or {}).get("label") == label and owner.get(t)})
+
+    # (name, amount, how it's won, what shows until it's decided, current holders)
+    prizes = [
+        ("🥇 Winner", 18, "owner of the team that lifts the cup", "the final decides it", placed("🏆 Champions")),
+        ("🥈 Runner-up", 9, "owner of the runner-up", "the final decides it", placed("🥈 Runner-up")),
+        ("🥉 Third place", 6, "owner of the third-place team", "the 3rd-place game decides it", placed("🥉 Third place")),
+        ("👟 Golden Boot", 6, "3 teams' most combined goals", "no goals yet", gb),
+        ("🌟 Hall of Fame", 6, "most fame trophies", "up for grabs", hall_leaders(fame_tally)),
+        ("🙈 Hall of Shame", 3, "most shame trophies (£3 back)", "up for grabs", hall_leaders(shame_tally)),
+    ]
+
+    money: dict[str, float] = {}
+    rows = []
+    for name, amt, rule, tbd, holders in prizes:
+        if holders:
+            for h in holders:
+                money[h] = money.get(h, 0) + amt / len(holders)
+            line = (f'<div class="mn-who">{html.escape(rule)} · '
+                    f'{", ".join(html.escape(h) for h in holders)}</div>')
+        else:
+            line = f'<div class="mn-tbd">{html.escape(rule)} · {html.escape(tbd)}</div>'
+        rows.append(f'<div class="mn-row"><div class="mn-top"><span class="mn-prize">'
+                    f'{name}</span><span class="mn-amt">£{amt}</span></div>{line}</div>')
+
+    def fmt(x: float) -> str:
+        return f"£{x:.0f}" if x == int(x) else f"£{x:.2f}"
+
+    standings = ""
+    if money:
+        ranked = sorted(money.items(), key=lambda kv: (-kv[1], kv[0]))
+        standings = ('<div class="lb"><div class="lb-h">In the money (provisional)</div>'
+                     + "".join(f'<div class="lb-row"><span class="lb-nm">{html.escape(p)}</span>'
+                               f'<span class="lb-ct" style="color:#ffd84d">{fmt(v)}</span></div>'
+                               for p, v in ranked) + "</div>")
+
+    st.markdown(
+        MONEY_CSS
+        + '<div class="mny"><div class="mny-h">Prizes · current leaders</div>'
+        + "".join(rows) + "</div>" + standings,
+        unsafe_allow_html=True,
+    )
+
+
 NEXT_CSS = """
 <style>
 .nextm { border:1px solid #1f7a4d; border-radius:12px; background:#0f3d28;
@@ -183,13 +258,8 @@ def header(b: dict) -> None:
     if not b["is_real"]:
         st.info("Demo allocation (Player 1–16). Add real names in Secrets — see README.", icon="ℹ️")
 
-    with st.expander("💷 £3 to enter · £48 pot · prizes"):
-        st.markdown(
-            "🎲 3 teams each, drawn at random — no picking, pure luck of the draw.\n\n"
-            "👥 16 players sharing all 48 teams:"
-        )
-        for icon, name, amt in PRIZES:
-            st.markdown(f"- {icon} **£{amt}** — {name}")
+    with st.expander("💷 £48 pot · prizes & leaders"):
+        render_money(b)
 
 
 # Streamlit columns stack vertically on a phone, so the player cards are rendered as
