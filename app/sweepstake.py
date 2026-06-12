@@ -273,6 +273,9 @@ def header(b: dict) -> None:
         for icon, name, amt in PRIZES:
             st.markdown(f"- {icon} **£{amt}** — {name}")
 
+    with st.expander("💷 Who's winning — live prize-money leaderboard"):
+        render_money(b)
+
 
 # Streamlit columns stack vertically on a phone, so the player cards are rendered as
 # inline HTML (like the Groups/Knockouts cards) to keep each team on one tidy row.
@@ -393,8 +396,6 @@ def main() -> None:
         ["🏆 Players", "🟩 Groups", "🥊 Knockouts", "🌟 Fame", "🙈 Shame"]
     )
     with tab_players:
-        render_money(b)
-        st.divider()
         render_players(b)
     with tab_groups:
         wallchart.render_groups(b)
