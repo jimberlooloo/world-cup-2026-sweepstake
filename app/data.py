@@ -48,7 +48,34 @@ def fetch_teams() -> list[dict]:
 
 
 def fetch_matches() -> list[dict]:
-    return _get(MATCHES_URL)["matches"]
+    matches = _get(MATCHES_URL)["matches"]
+    _overlay_espn(matches)
+    return matches
+
+
+def _overlay_espn(matches: list[dict]) -> None:
+    """Overlay timely scores + goal events from ESPN onto the openfootball fixtures,
+    matched by the (real) team pairing. Any ESPN failure leaves openfootball untouched —
+    a graceful fallback, never a crash. Unresolved knockout slots have no real teams yet,
+    so they simply don't match and stay as placeholders until the bracket fills."""
+    try:
+        import espn
+        results = espn.fetch_results()
+    except Exception:
+        return
+    for m in matches:
+        t1, t2 = m.get("team1"), m.get("team2")
+        ov = results.get(frozenset((t1, t2)))
+        if not ov:
+            continue
+        s1, s2 = ov["score_by_team"].get(t1, {}), ov["score_by_team"].get(t2, {})
+        score = {ph: [s1.get(ph, 0), s2.get(ph, 0)]
+                 for ph in ("ht", "ft", "et", "p") if ph in s1 or ph in s2}
+        if "ft" not in score and "et" not in score:
+            continue  # not enough to call it played
+        m["score"] = score
+        m["goals1"] = ov["goals"].get(t1, [])
+        m["goals2"] = ov["goals"].get(t2, [])
 
 
 def team_flag_map(teams: list[dict]) -> dict[str, str]:
