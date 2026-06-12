@@ -71,21 +71,26 @@ def parse_summary(summary: dict) -> dict | None:
         return None
 
     goals: dict[str, list] = {nm: [] for nm in names}
+    cards: dict[str, list] = {nm: [] for nm in names}
     for e in summary.get("keyEvents", []):
         ttype = (e.get("type") or {}).get("text", "")
-        if not ("Goal" in ttype or ttype == "Penalty - Scored"):
-            continue
         tnm = id2name.get((e.get("team") or {}).get("id"))
         if tnm not in goals:
             continue
-        minute, offset = _minute_parts((e.get("clock") or {}).get("displayValue", ""))
         parts = e.get("participants") or []
-        scorer = ((parts[0].get("athlete") or {}).get("displayName", "")) if parts else ""
-        goals[tnm].append({
-            "name": scorer, "minute": minute, "offset": offset,
-            "penalty": ttype == "Penalty - Scored",
-            "owngoal": "Own Goal" in ttype,
-        })
+        minute, offset = _minute_parts((e.get("clock") or {}).get("displayValue", ""))
+        if "Goal" in ttype or ttype == "Penalty - Scored":
+            scorer = ((parts[0].get("athlete") or {}).get("displayName", "")) if parts else ""
+            assist = ((parts[1].get("athlete") or {}).get("displayName", "")) if len(parts) > 1 else ""
+            goals[tnm].append({
+                "name": scorer, "assist": assist, "minute": minute, "offset": offset,
+                "penalty": ttype == "Penalty - Scored",
+                "owngoal": "Own Goal" in ttype,
+            })
+        elif ttype in ("Yellow Card", "Red Card"):
+            player = ((parts[0].get("athlete") or {}).get("displayName", "")) if parts else ""
+            cards[tnm].append({"name": player, "minute": minute,
+                               "type": "red" if ttype == "Red Card" else "yellow"})
 
     n = max(len(linescores[names[0]]), len(linescores[names[1]]))
 
@@ -102,7 +107,8 @@ def parse_summary(summary: dict) -> dict | None:
             d["ft"] = sum(v)
         return d
 
-    return {"goals": goals, "score_by_team": {nm: per(nm) for nm in names}}
+    return {"goals": goals, "cards": cards,
+            "score_by_team": {nm: per(nm) for nm in names}}
 
 
 def fetch_results() -> dict:

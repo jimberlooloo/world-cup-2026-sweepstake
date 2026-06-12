@@ -577,6 +577,61 @@ def whipping_boys(b: dict) -> dict:
             "teams": losers, "detail": " · ".join(details)}
 
 
+def playmaker(b: dict) -> dict:
+    owner = b["owner"]
+    tally: dict[str, int] = {}
+    team_of: dict[str, str] = {}
+    for m in b["_matches"]:
+        for goals, team in ((m.get("goals1"), m["team1"]), (m.get("goals2"), m["team2"])):
+            for g in (goals or []):
+                a = g.get("assist")
+                if a:
+                    tally[a] = tally.get(a, 0) + 1
+                    team_of[a] = team
+    top = max(tally.values(), default=0)
+    if top == 0:
+        return {"status": "open"}
+    makers = [a for a, c in tally.items() if c == top]
+    teams = [team_of[a] for a in makers]
+    return {"status": "won", "holders": sorted({owner.get(t, "—") for t in teams}),
+            "teams": teams, "detail": " · ".join(f"{a} ({top}) — {team_of[a]}" for a in makers)}
+
+
+def bad_boys(b: dict) -> dict:
+    owner = b["owner"]
+    by_player: dict[str, int] = {}
+    for m in b["_matches"]:
+        for cards, team in ((m.get("cards1"), m["team1"]), (m.get("cards2"), m["team2"])):
+            p = owner.get(team)
+            if not p:
+                continue
+            for c in (cards or []):
+                if c.get("type") == "yellow":
+                    by_player[p] = by_player.get(p, 0) + 1
+    top = max(by_player.values(), default=0)
+    if top == 0:
+        return {"status": "open"}
+    return {"status": "won", "holders": sorted(p for p, c in by_player.items() if c == top),
+            "detail": f"{top} yellow card{'s' if top != 1 else ''}"}
+
+
+def seeing_red(b: dict) -> dict:
+    owner = b["owner"]
+    holders, details = set(), []
+    for m in b["_matches"]:
+        for cards, team in ((m.get("cards1"), m["team1"]), (m.get("cards2"), m["team2"])):
+            p = owner.get(team)
+            if not p:
+                continue
+            for c in (cards or []):
+                if c.get("type") == "red":
+                    holders.add(p)
+                    details.append(f"{c.get('name', '?')} ({team})")
+    if not holders:
+        return {"status": "open"}
+    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+
+
 AWARDS = [
     {"icon": "🩸", "name": "First Blood", "blurb": "Owned the team that scored the tournament's first goal", "fn": first_blood},
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
@@ -593,6 +648,7 @@ AWARDS = [
     {"icon": "🐎", "name": "Dark Horse", "blurb": "Your bottom-pot team outscores both your stronger teams", "fn": dark_horse},
     {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
     {"icon": "🎭", "name": "The Entertainers", "blurb": "Your teams' games rack up the most goals (scored + conceded)", "fn": the_entertainers},
+    {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
     {"icon": "🥄", "name": "Wooden Spoon", "blurb": "Fewest combined goals (settled after the group stage)", "fn": wooden_spoon, "booby": True},
     {"icon": "🪣", "name": "Total Wipeout", "blurb": "All three of your teams out in the group stage", "fn": total_wipeout, "booby": True},
     {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
@@ -605,6 +661,8 @@ AWARDS = [
     {"icon": "🤐", "name": "Goal Shy", "blurb": "One of your teams fails to score in the group stage", "fn": goal_shy, "booby": True},
     {"icon": "🦆", "name": "Sitting Duck", "blurb": "Own the team that concedes the fastest goal", "fn": sitting_duck, "booby": True},
     {"icon": "🧎", "name": "Whipping Boys", "blurb": "Own the team on the wrong end of the Biggest Thrashing", "fn": whipping_boys, "booby": True},
+    {"icon": "🟨", "name": "Bad Boys", "blurb": "Your three teams rack up the most yellow cards", "fn": bad_boys, "booby": True},
+    {"icon": "🟥", "name": "Seeing Red", "blurb": "Own a team that gets a player sent off", "fn": seeing_red, "booby": True},
 ]
 
 
