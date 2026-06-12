@@ -848,7 +848,7 @@ def render_shame(b: dict) -> None:
     tally = _tally(shame)
     shame.sort(key=lambda ar: ar[1].get("status") != "won")  # won trophies float to the top
     st.subheader("🙈 Hall of Shame")
-    st.caption("Win a shame trophy, earn a point — most takes the £3 back.")
+    st.caption("Win a shame trophy, earn a point — most takes the £3.")
     if not tally:
         st.info("No shame yet — the £3 refund is still anyone's to lose!", icon="🥄")
     else:
