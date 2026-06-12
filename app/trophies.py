@@ -797,6 +797,7 @@ def render_fame(b: dict) -> None:
     flags = b["flags"]
     good = [(a, a["fn"](b)) for a in AWARDS if not a.get("booby")]
     tally = _tally(good)
+    good.sort(key=lambda ar: ar[1].get("status") != "won")  # won trophies float to the top
     st.subheader("🌟 Hall of Fame")
     st.caption("Win a trophy, earn a point — most trophies takes the £6.")
     if not tally:
@@ -815,6 +816,7 @@ def render_shame(b: dict) -> None:
     flags = b["flags"]
     shame = [(a, a["fn"](b)) for a in AWARDS if a.get("booby")]
     tally = _tally(shame)
+    shame.sort(key=lambda ar: ar[1].get("status") != "won")  # won trophies float to the top
     st.subheader("🙈 Hall of Shame")
     st.caption("Collect the shame trophies — the most takes the Hall of Shame and gets "
                "your £3 entry back (split if tied).")
