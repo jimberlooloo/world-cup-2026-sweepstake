@@ -767,6 +767,14 @@ CSS = """
 .trophy.booby .tr-win b { color:#d7d7de; }
 .tr-open { padding:8px 14px; color:#7a7a86; font-size:12px; font-style:italic;
            border-top:1px solid #ffffff10; }
+.lb { border:1px solid #2a2a33; border-radius:10px; background:#15151c;
+      margin-bottom:10px; overflow:hidden; }
+.lb-h { background:#1c1c26; color:#9090a0; font-size:10px; font-weight:700;
+        text-transform:uppercase; letter-spacing:1px; padding:5px 12px; }
+.lb-row { display:flex; justify-content:space-between; align-items:center;
+          padding:5px 12px; border-top:1px solid #ffffff0d; font-size:13px; }
+.lb-row .lb-nm { color:#e8e8ef; font-weight:600; }
+.lb-row .lb-ct { font-weight:800; }
 </style>
 """
 
@@ -793,6 +801,19 @@ def _tally(results: list) -> dict[str, int]:
     return tally
 
 
+def _standings_html(tally: dict[str, int], label: str, accent: str) -> str:
+    """Compact ranked 'who holds how many' list, highest first."""
+    if not tally:
+        return ""
+    rows = sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))
+    body = "".join(
+        f'<div class="lb-row"><span class="lb-nm">{_esc(p)}</span>'
+        f'<span class="lb-ct" style="color:{accent}">{c}</span></div>'
+        for p, c in rows
+    )
+    return f'<div class="lb"><div class="lb-h">{label}</div>{body}</div>'
+
+
 def render_fame(b: dict) -> None:
     flags = b["flags"]
     good = [(a, a["fn"](b)) for a in AWARDS if not a.get("booby")]
@@ -807,9 +828,10 @@ def render_fame(b: dict) -> None:
         leaders = sorted(p for p, c in tally.items() if c == top)
         word = "trophy" if top == 1 else "trophies"
         st.success(f"🌟 **£6** — leading with **{top}** {word}: {', '.join(leaders)}", icon="🌟")
-    st.markdown(CSS + '<div class="tr">'
-                + "".join(_card(a, r, flags) for a, r in good) + "</div>",
-                unsafe_allow_html=True)
+    st.markdown(
+        CSS + _standings_html(tally, "Fame trophies", "#ffd84d")
+        + '<div class="tr">' + "".join(_card(a, r, flags) for a, r in good) + "</div>",
+        unsafe_allow_html=True)
 
 
 def render_shame(b: dict) -> None:
@@ -829,6 +851,7 @@ def render_shame(b: dict) -> None:
         tail = " — split" if len(losers) > 1 else ""
         st.warning(f"🥄 **£3 back** — Hall of Shame leader on {worst} shame {word}: "
                    f"{', '.join(losers)}{tail}", icon="🥄")
-    st.markdown(CSS + '<div class="tr">'
-                + "".join(_card(a, r, flags) for a, r in shame) + "</div>",
-                unsafe_allow_html=True)
+    st.markdown(
+        CSS + _standings_html(tally, "Shame trophies", "#d7d7de")
+        + '<div class="tr">' + "".join(_card(a, r, flags) for a, r in shame) + "</div>",
+        unsafe_allow_html=True)
