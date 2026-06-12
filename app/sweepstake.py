@@ -114,6 +114,88 @@ def gate() -> bool:
 
 # ------------------------------------------------------------------------- render
 
+MONEY_CSS = """
+<style>
+.mny { border:1px solid #1f7a4d; border-radius:12px; background:#0f3d28;
+       overflow:hidden; margin-bottom:10px; }
+.mny-h { background:#16a35a; color:#fff; font-weight:800; font-size:14px;
+         padding:7px 12px; letter-spacing:.3px; }
+.mn-row { padding:7px 12px; border-top:1px solid #1f7a4d33; }
+.mn-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.mn-prize { font-weight:600; color:#eafff3; font-size:14px; }
+.mn-amt { color:#ffd84d; font-weight:800; font-size:14px; white-space:nowrap; }
+.mn-who { color:#9fdcbb; font-size:12px; margin-top:1px; }
+.mn-tbd { color:#5fae86; font-size:12px; font-style:italic; margin-top:1px; }
+.lb { border:1px solid #2a2a33; border-radius:10px; background:#15151c;
+      margin-bottom:10px; overflow:hidden; }
+.lb-h { background:#1c1c26; color:#9090a0; font-size:10px; font-weight:700;
+        text-transform:uppercase; letter-spacing:1px; padding:5px 12px; }
+.lb-row { display:flex; justify-content:space-between; align-items:center;
+          padding:5px 12px; border-top:1px solid #ffffff0d; font-size:13px; }
+.lb-row .lb-nm { color:#e8e8ef; font-weight:600; }
+.lb-row .lb-ct { font-weight:800; }
+</style>
+"""
+
+
+def render_money(b: dict) -> None:
+    """Consolidated 'who's winning' view — current leader of every cash prize plus each
+    player's provisional winnings (ties split the prize; placings stay TBD until decided)."""
+    goals, owner, allocation, status = b["goals"], b["owner"], b["allocation"], b["status"]
+    totals = {p: sum(goals.get(t, 0) for t in ts) for p, ts in allocation.items()}
+    gb_top = max(totals.values(), default=0)
+    gb = sorted(p for p, v in totals.items() if v == gb_top and gb_top > 0)
+
+    fame_tally, shame_tally = trophies.hall_tallies(b)
+
+    def hall_leaders(t: dict) -> list:
+        return sorted(p for p, c in t.items() if c == max(t.values())) if t else []
+
+    def placed(label: str) -> list:
+        return sorted({owner[t] for t, s in status.items()
+                       if (s or {}).get("label") == label and owner.get(t)})
+
+    prizes = [
+        ("🥇 Winner", 18, placed("🏆 Champions"), "decided at the final"),
+        ("🥈 Runner-up", 9, placed("🥈 Runner-up"), "decided at the final"),
+        ("🥉 Third place", 6, placed("🥉 Third place"), "decided at the 3rd-place game"),
+        ("👟 Golden Boot", 6, gb, f"{gb_top} goals" if gb_top else "no goals yet"),
+        ("🌟 Hall of Fame", 6, hall_leaders(fame_tally), "most fame trophies"),
+        ("🙈 Hall of Shame", 3, hall_leaders(shame_tally), "most shame trophies"),
+    ]
+
+    money: dict[str, float] = {}
+    rows = []
+    for name, amt, holders, note in prizes:
+        if holders:
+            for h in holders:
+                money[h] = money.get(h, 0) + amt / len(holders)
+            who = (f'<div class="mn-who">{", ".join(html.escape(h) for h in holders)} · '
+                   f'{note}</div>')
+        else:
+            who = f'<div class="mn-tbd">{note}</div>'
+        rows.append(f'<div class="mn-row"><div class="mn-top"><span class="mn-prize">'
+                    f'{name}</span><span class="mn-amt">£{amt}</span></div>{who}</div>')
+
+    def fmt(x: float) -> str:
+        return f"£{x:.0f}" if x == int(x) else f"£{x:.2f}"
+
+    standings = ""
+    if money:
+        ranked = sorted(money.items(), key=lambda kv: (-kv[1], kv[0]))
+        standings = ('<div class="lb"><div class="lb-h">In the money (provisional)</div>'
+                     + "".join(f'<div class="lb-row"><span class="lb-nm">{html.escape(p)}</span>'
+                               f'<span class="lb-ct" style="color:#ffd84d">{fmt(v)}</span></div>'
+                               for p, v in ranked) + "</div>")
+
+    st.markdown(
+        MONEY_CSS + standings
+        + '<div class="mny"><div class="mny-h">💷 Prize money — who’s leading</div>'
+        + "".join(rows) + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 NEXT_CSS = """
 <style>
 .nextm { border:1px solid #1f7a4d; border-radius:12px; background:#0f3d28;
@@ -311,6 +393,8 @@ def main() -> None:
         ["🏆 Players", "🟩 Groups", "🥊 Knockouts", "🌟 Fame", "🙈 Shame"]
     )
     with tab_players:
+        render_money(b)
+        st.divider()
         render_players(b)
     with tab_groups:
         wallchart.render_groups(b)

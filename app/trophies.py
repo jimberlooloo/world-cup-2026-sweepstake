@@ -801,6 +801,14 @@ def _tally(results: list) -> dict[str, int]:
     return tally
 
 
+def hall_tallies(b: dict) -> tuple[dict, dict]:
+    """(fame_tally, shame_tally) — trophies held per player in each hall. For the Money view."""
+    results = [(a, a["fn"](b)) for a in AWARDS]
+    good = _tally([(a, r) for a, r in results if not a.get("booby")])
+    bad = _tally([(a, r) for a, r in results if a.get("booby")])
+    return good, bad
+
+
 def _standings_html(tally: dict[str, int], label: str, accent: str) -> str:
     """Compact ranked 'who holds how many' list, highest first."""
     if not tally:
