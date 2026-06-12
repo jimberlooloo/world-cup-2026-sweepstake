@@ -856,9 +856,8 @@ def render_shame(b: dict) -> None:
         worst = max(tally.values())
         losers = sorted(p for p, c in tally.items() if c == worst)
         word = "trophy" if worst == 1 else "trophies"
-        tail = " — split" if len(losers) > 1 else ""
-        st.warning(f"**£3 back** — Hall of Shame leader on {worst} shame {word}: "
-                   f"{', '.join(losers)}{tail}", icon="🥄")
+        st.warning(f"**£3 back** — leading with **{worst}** {word}: {', '.join(losers)}",
+                   icon="🥄")
     st.markdown(
         CSS + _standings_html(tally, "Shame trophies", "#d7d7de")
         + '<div class="tr">' + "".join(_card(a, r, flags) for a, r in shame) + "</div>",
