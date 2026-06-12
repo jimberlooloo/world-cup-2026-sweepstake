@@ -260,8 +260,7 @@ def header(b: dict) -> None:
 
     with st.expander("💷 Prizes & who's winning"):
         st.markdown(
-            "🎲 3 teams each, drawn at random — no picking, pure luck of the draw.\n\n"
-            "👥 16 players share all 48 teams. Each prize below shows who's leading it now:"
+            "🎲 16 players · 3 random teams each · all 48 shared. Who's leading each prize:"
         )
         render_money(b)
 
