@@ -801,9 +801,23 @@ def _tally(results: list) -> dict[str, int]:
     return tally
 
 
+def _resolve(award: dict, b: dict) -> dict:
+    """Run a trophy resolver, but never let one buggy resolver crash the whole app — on
+    any error treat the trophy as not-yet-won. Live feed data throws up odd edge cases.
+    The failure is logged (owner-only app logs) so we can find and fix the real cause."""
+    try:
+        return award["fn"](b)
+    except Exception as exc:  # noqa: BLE001 — resilience over a single trophy is the priority
+        import sys
+        import traceback
+        print(f"[trophy] '{award.get('name')}' resolver failed: {exc!r}", file=sys.stderr)
+        traceback.print_exc()
+        return {"status": "open"}
+
+
 def hall_tallies(b: dict) -> tuple[dict, dict]:
     """(fame_tally, shame_tally) — trophies held per player in each hall. For the Money view."""
-    results = [(a, a["fn"](b)) for a in AWARDS]
+    results = [(a, _resolve(a, b)) for a in AWARDS]
     good = _tally([(a, r) for a, r in results if not a.get("booby")])
     bad = _tally([(a, r) for a, r in results if a.get("booby")])
     return good, bad
@@ -824,7 +838,7 @@ def _standings_html(tally: dict[str, int], label: str, accent: str) -> str:
 
 def render_fame(b: dict) -> None:
     flags = b["flags"]
-    good = [(a, a["fn"](b)) for a in AWARDS if not a.get("booby")]
+    good = [(a, _resolve(a, b)) for a in AWARDS if not a.get("booby")]
     tally = _tally(good)
     good.sort(key=lambda ar: ar[1].get("status") != "won")  # won trophies float to the top
     st.subheader("🌟 Hall of Fame")
@@ -844,7 +858,7 @@ def render_fame(b: dict) -> None:
 
 def render_shame(b: dict) -> None:
     flags = b["flags"]
-    shame = [(a, a["fn"](b)) for a in AWARDS if a.get("booby")]
+    shame = [(a, _resolve(a, b)) for a in AWARDS if a.get("booby")]
     tally = _tally(shame)
     shame.sort(key=lambda ar: ar[1].get("status") != "won")  # won trophies float to the top
     st.subheader("🙈 Hall of Shame")
