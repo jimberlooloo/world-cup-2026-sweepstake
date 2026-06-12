@@ -70,27 +70,44 @@ def parse_summary(summary: dict) -> dict | None:
     if len(names) != 2:
         return None
 
+    # Who came on as a substitute — the rosters flag the bench reliably (the substitution
+    # *events* don't mark direction), so we can spot a sub who then scores.
+    subbed_in: dict[str, set] = {nm: set() for nm in names}
+    for tr in summary.get("rosters", []):
+        tnm = _name((tr.get("team") or {}).get("displayName", ""))
+        if tnm in subbed_in:
+            for a in (tr.get("roster") or []):
+                if a.get("subbedIn"):
+                    subbed_in[tnm].add((a.get("athlete") or {}).get("displayName", ""))
+
     goals: dict[str, list] = {nm: [] for nm in names}
     cards: dict[str, list] = {nm: [] for nm in names}
+    pen_misses: dict[str, list] = {nm: [] for nm in names}
+    in_shootout = False
     for e in summary.get("keyEvents", []):
         ttype = (e.get("type") or {}).get("text", "")
+        if ttype == "Start Shootout":
+            in_shootout = True  # later pen events are shootout kicks, not open-play misses
+            continue
         tnm = id2name.get((e.get("team") or {}).get("id"))
         if tnm not in goals:
             continue
         parts = e.get("participants") or []
+        player = ((parts[0].get("athlete") or {}).get("displayName", "")) if parts else ""
         minute, offset = _minute_parts((e.get("clock") or {}).get("displayValue", ""))
         if "Goal" in ttype or ttype == "Penalty - Scored":
-            scorer = ((parts[0].get("athlete") or {}).get("displayName", "")) if parts else ""
             assist = ((parts[1].get("athlete") or {}).get("displayName", "")) if len(parts) > 1 else ""
             goals[tnm].append({
-                "name": scorer, "assist": assist, "minute": minute, "offset": offset,
+                "name": player, "assist": assist, "minute": minute, "offset": offset,
                 "penalty": ttype == "Penalty - Scored",
                 "owngoal": "Own Goal" in ttype,
+                "sub": player in subbed_in.get(tnm, set()),
             })
         elif ttype in ("Yellow Card", "Red Card"):
-            player = ((parts[0].get("athlete") or {}).get("displayName", "")) if parts else ""
             cards[tnm].append({"name": player, "minute": minute,
                                "type": "red" if ttype == "Red Card" else "yellow"})
+        elif ttype in ("Penalty - Missed", "Penalty - Saved") and not in_shootout:
+            pen_misses[tnm].append({"name": player, "minute": minute})
 
     n = max(len(linescores[names[0]]), len(linescores[names[1]]))
 
@@ -107,7 +124,7 @@ def parse_summary(summary: dict) -> dict | None:
             d["ft"] = sum(v)
         return d
 
-    return {"goals": goals, "cards": cards,
+    return {"goals": goals, "cards": cards, "pen_misses": pen_misses,
             "score_by_team": {nm: per(nm) for nm in names}}
 
 

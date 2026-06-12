@@ -597,6 +597,82 @@ def playmaker(b: dict) -> dict:
             "teams": teams, "detail": " · ".join(f"{a} ({top}) — {team_of[a]}" for a in makers)}
 
 
+def super_sub(b: dict) -> dict:
+    owner = b["owner"]
+    holders, details = set(), []
+    for m in b["_matches"]:
+        for goals, team in ((m.get("goals1"), m["team1"]), (m.get("goals2"), m["team2"])):
+            p = owner.get(team)
+            if not p:
+                continue
+            for g in (goals or []):
+                if g.get("sub") and not g.get("owngoal"):
+                    holders.add(p)
+                    details.append(f"{g.get('name', '?')} ({team})")
+    if not holders:
+        return {"status": "open"}
+    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+
+
+def ten_men(b: dict) -> dict:
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    holders, details = set(), []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        winner, loser = _winner_loser(m, sc)
+        for cards, team in ((m.get("cards1"), m["team1"]), (m.get("cards2"), m["team2"])):
+            p = owner.get(team)
+            if not p:
+                continue
+            if any(c.get("type") == "red" for c in (cards or [])) and team != loser:
+                holders.add(p)
+                details.append(f"{team} ({'won' if team == winner else 'drew'} with 10)")
+    if not holders:
+        return {"status": "open"}
+    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+
+
+def mr_everything(b: dict) -> dict:
+    owner = b["owner"]
+    tally: dict[str, int] = {}
+    team_of: dict[str, str] = {}
+    for m in b["_matches"]:
+        for goals, team in ((m.get("goals1"), m["team1"]), (m.get("goals2"), m["team2"])):
+            for g in (goals or []):
+                if g.get("owngoal"):
+                    continue
+                for who in (g.get("name"), g.get("assist")):
+                    if who:
+                        tally[who] = tally.get(who, 0) + 1
+                        team_of[who] = team
+    top = max(tally.values(), default=0)
+    if top == 0:
+        return {"status": "open"}
+    best = [nm for nm, c in tally.items() if c == top]
+    teams = [team_of[nm] for nm in best]
+    return {"status": "won", "holders": sorted({owner.get(t, "—") for t in teams}),
+            "teams": teams, "detail": " · ".join(f"{nm} ({top}) — {team_of[nm]}" for nm in best)}
+
+
+def penalty_villain(b: dict) -> dict:
+    owner = b["owner"]
+    holders, details = set(), []
+    for m in b["_matches"]:
+        for misses, team in ((m.get("pen_misses1"), m["team1"]), (m.get("pen_misses2"), m["team2"])):
+            p = owner.get(team)
+            if not p:
+                continue
+            for pm in (misses or []):
+                holders.add(p)
+                details.append(f"{pm.get('name', '?')} ({team})")
+    if not holders:
+        return {"status": "open"}
+    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+
+
 def bad_boys(b: dict) -> dict:
     owner = b["owner"]
     by_player: dict[str, int] = {}
@@ -649,6 +725,9 @@ AWARDS = [
     {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
     {"icon": "🎭", "name": "The Entertainers", "blurb": "Your teams' games rack up the most goals (scored + conceded)", "fn": the_entertainers},
     {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
+    {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
+    {"icon": "🔥", "name": "Super Sub", "blurb": "A substitute on one of your teams comes on and scores", "fn": super_sub},
+    {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
     {"icon": "🥄", "name": "Wooden Spoon", "blurb": "Fewest combined goals (settled after the group stage)", "fn": wooden_spoon, "booby": True},
     {"icon": "🪣", "name": "Total Wipeout", "blurb": "All three of your teams out in the group stage", "fn": total_wipeout, "booby": True},
     {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
@@ -663,6 +742,7 @@ AWARDS = [
     {"icon": "🧎", "name": "Whipping Boys", "blurb": "Own the team on the wrong end of the Biggest Thrashing", "fn": whipping_boys, "booby": True},
     {"icon": "🟨", "name": "Bad Boys", "blurb": "Your three teams rack up the most yellow cards", "fn": bad_boys, "booby": True},
     {"icon": "🟥", "name": "Seeing Red", "blurb": "Own a team that gets a player sent off", "fn": seeing_red, "booby": True},
+    {"icon": "🥅", "name": "Penalty Villain", "blurb": "Your team's player misses or has a penalty saved in open play", "fn": penalty_villain, "booby": True},
 ]
 
 
@@ -717,6 +797,7 @@ def render_fame(b: dict) -> None:
     flags = b["flags"]
     good = [(a, a["fn"](b)) for a in AWARDS if not a.get("booby")]
     tally = _tally(good)
+    good.sort(key=lambda ar: ar[1].get("status") != "won")  # won trophies float to the top
     st.subheader("🌟 Hall of Fame")
     st.caption("Win a trophy, earn a point — most trophies takes the £6.")
     if not tally:
@@ -735,6 +816,7 @@ def render_shame(b: dict) -> None:
     flags = b["flags"]
     shame = [(a, a["fn"](b)) for a in AWARDS if a.get("booby")]
     tally = _tally(shame)
+    shame.sort(key=lambda ar: ar[1].get("status") != "won")  # won trophies float to the top
     st.subheader("🙈 Hall of Shame")
     st.caption("Collect the shame trophies — the most takes the Hall of Shame and gets "
                "your £3 entry back (split if tied).")
