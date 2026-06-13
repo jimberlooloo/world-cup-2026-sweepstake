@@ -39,12 +39,12 @@ st.markdown(
     "[data-baseweb='tab-list']{gap:6px;}"  # fit all 5 tabs across a phone, no swipe
     "[data-testid='stHorizontalBlock']{flex-wrap:nowrap;align-items:center;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']{min-width:0;}"
-    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:last-child"
+    # Right column (btn_group) pushes its content to the right
+    "[data-testid='stHorizontalBlock']:first-of-type>[data-testid='stColumn']:last-child"
     "{display:flex;justify-content:flex-end;}"
-    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:nth-last-child(2)"
-    "{display:flex;justify-content:flex-end;}"
-    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:nth-last-child(3)"
-    "{display:flex;justify-content:flex-end;}"
+    # Inner button row: no gap, buttons sit flush together
+    "[data-testid='stHorizontalBlock']:first-of-type>[data-testid='stColumn']:last-child"
+    " [data-testid='stHorizontalBlock']{gap:4px!important;}"
     # Compact icon buttons — only the header row has st.columns, so this is safe
     "[data-testid='stHorizontalBlock'] button"
     "{padding:0.3rem 0.5rem!important;min-height:0!important;line-height:1!important;"
@@ -350,9 +350,11 @@ UPDATES = [
 def header(b: dict) -> None:
     import json
     st.title("🏆 World Cup 2026")
-    left, refresh_col, share_col, updates_col = st.columns([4, 1, 1, 1], vertical_alignment="center")
+    left, btn_group = st.columns([3, 2], vertical_alignment="center")
     with left:
         st.markdown(f"**{b['played']}/{b['total']}** matches played")
+    with btn_group:
+        refresh_col, share_col, updates_col = st.columns(3, vertical_alignment="center")
     with refresh_col:
         if st.button("🔄", help="Refresh"):
             st.cache_data.clear()
