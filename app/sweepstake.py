@@ -45,12 +45,14 @@ st.markdown(
     # Inner button row: no gap, buttons sit flush together
     "[data-testid='stHorizontalBlock']:first-of-type>[data-testid='stColumn']:last-child"
     " [data-testid='stHorizontalBlock']{gap:4px!important;}"
-    # Compact icon buttons — only the header row has st.columns, so this is safe
+    # Flat ghost icon buttons in the header — no border, no background box
     "[data-testid='stHorizontalBlock'] button"
-    "{padding:0.3rem 0.5rem!important;min-height:0!important;line-height:1!important;"
-    "font-size:1.1rem!important;}"
+    "{padding:0.3rem 0.4rem!important;min-height:0!important;line-height:1!important;"
+    "font-size:1.2rem!important;background:transparent!important;"
+    "border:none!important;box-shadow:none!important;}"
+    "[data-testid='stHorizontalBlock'] button:hover"
+    "{background:rgba(255,255,255,0.08)!important;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stPopover']{display:flex;}"
-    # Hide the chevron arrow on the popover button so it matches the other icon buttons
     "[data-testid='stHorizontalBlock'] [data-testid='stPopover'] button svg{display:none!important;}"
     "</style>",
     unsafe_allow_html=True,
@@ -366,12 +368,11 @@ def header(b: dict) -> None:
             html,body{{margin:0;padding:0;width:36px;overflow:hidden;}}
             body{{background:transparent;display:flex;justify-content:center;
                  align-items:center;height:36px;}}
-            button{{background:#1a1a2e;border:1px solid #555;border-radius:6px;
-                   color:#fafafa;font-size:18px;padding:5px 9px;cursor:pointer;
+            button{{background:transparent;border:none;border-radius:6px;
+                   color:#fafafa;font-size:19px;padding:5px 6px;cursor:pointer;
                    line-height:1;font-family:system-ui,sans-serif;display:flex;
                    align-items:center;justify-content:center;}}
-            button:hover{{border-color:#888;background:#2a2a3e;}}
-            button:active{{background:#3a3a4e;}}
+            button:hover{{background:rgba(255,255,255,0.08);}}
             </style>
             <button onclick="share()" title="Share">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
