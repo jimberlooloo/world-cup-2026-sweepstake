@@ -336,6 +336,14 @@ UPDATES = [
     ("13 Jun", "📤 Share button — send a score snapshot to the group"),
     ("13 Jun", "🔴 Live match banner when a game is in progress"),
     ("12 Jun", "🏆 One trophy line per person on Fame & Shame cards"),
+    ("12 Jun", "💷 Prize money standings — see who's in the money"),
+    ("12 Jun", "🎖️ Trophy standings table in Fame & Shame"),
+    ("12 Jun", "🃏 New trophies: Super Sub, Penalty Villain, Ten Men, Mr Everything"),
+    ("12 Jun", "🟨 New trophies: Bad Boys, Seeing Red, Playmaker"),
+    ("12 Jun", "⚡ Live scores via ESPN — results update within minutes"),
+    ("11 Jun", "🏆 Fame & Shame — 34 trophies for every occasion"),
+    ("10 Jun", "🗓️ Wall chart — groups, knockouts and Golden Boot race"),
+    ("10 Jun", "🎉 Sweepstake launched — 16 players, 48 teams, one winner"),
 ]
 
 
