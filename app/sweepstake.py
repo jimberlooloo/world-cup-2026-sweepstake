@@ -41,6 +41,8 @@ st.markdown(
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']{min-width:0;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:last-child"
     "{display:flex;justify-content:flex-end;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:nth-last-child(2)"
+    "{display:flex;justify-content:flex-end;}"
     "</style>",
     unsafe_allow_html=True,
 )
@@ -282,11 +284,86 @@ def next_match(b: dict) -> None:
     )
 
 
+def _share_text(b: dict) -> str:
+    """Compact share snapshot — top 5 for goals, fame trophies, shame trophies."""
+    goals_by_player = sorted(
+        ((p, sum(b["goals"].get(t, 0) for t in ts)) for p, ts in b["allocation"].items()),
+        key=lambda x: -x[1],
+    )
+    fame, shame = trophies.hall_tallies(b)
+    top_fame = sorted(fame.items(), key=lambda x: -x[1])[:5]
+    top_shame = sorted(shame.items(), key=lambda x: -x[1])[:5]
+
+    lines = [f"🏆 World Cup 2026 Sweepstake", f"{b['played']}/{b['total']} matches played"]
+    goals_top = [(p, g) for p, g in goals_by_player[:5] if g > 0]
+    if goals_top:
+        lines.append("⚽ Goals: " + " · ".join(f"{p} {g}" for p, g in goals_top))
+    if top_fame:
+        lines.append("🌟 Fame: " + " · ".join(f"{p} {c}" for p, c in top_fame))
+    if top_shame:
+        lines.append("🙈 Shame: " + " · ".join(f"{p} {c}" for p, c in top_shame))
+    # Live match or next match
+    live = b.get("_live", [])
+    if live:
+        for lm in live:
+            lines.append(f"🔴 LIVE: {lm['team1']} {lm['score'][0]}–{lm['score'][1]} {lm['team2']}"
+                         + (f" · {lm['clock']}" if lm.get("clock") else ""))
+    else:
+        upcoming = sorted(
+            ((feed._uk_kickoff(m.get("date", ""), m.get("time", "")), m)
+             for m in b["_matches"] if feed._on_pitch(m.get("score")) is None
+             and feed._uk_kickoff(m.get("date", ""), m.get("time", "")) is not None),
+            key=lambda x: x[0],
+        )
+        if upcoming:
+            ko, m = upcoming[0]
+            when = f"{ko.strftime('%a')} {ko.day} {ko.strftime('%b')} {ko.strftime('%H:%M')}"
+            lines.append(f"⚽ Next up: {m['team1']} v {m['team2']} · {when}")
+    return "\n".join(lines)
+
+
 def header(b: dict) -> None:
+    import json
     st.title("🏆 World Cup 2026")
-    left, right = st.columns([2, 1], vertical_alignment="center")
+    left, mid, right = st.columns([3, 1, 1], vertical_alignment="center")
     with left:
         st.markdown(f"**{b['played']}/{b['total']}** matches played")
+    with mid:
+        share_json = json.dumps(_share_text(b))
+        st.components.v1.html(
+            f"""<style>
+            body{{margin:0;background:transparent;display:flex;justify-content:flex-end;
+                 align-items:center;height:38px;}}
+            button{{background:transparent;border:1px solid #555;border-radius:6px;
+                   color:#fafafa;font-size:14px;padding:4px 10px;cursor:pointer;
+                   white-space:nowrap;font-family:system-ui,sans-serif;}}
+            button:active{{background:#ffffff22;}}
+            </style>
+            <button onclick="share()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2.2"
+                stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+              </svg>
+              Share
+            </button>
+            <script>
+            function share(){{
+              var text={share_json};
+              var nav=(window.top&&window.top.navigator)||navigator;
+              if(nav.share){{
+                nav.share({{title:'World Cup 2026 Sweepstake',text:text}}).catch(function(){{}});
+              }}else{{
+                navigator.clipboard.writeText(text)
+                  .then(function(){{alert('Copied to clipboard!');}})
+                  .catch(function(){{alert('Share not supported on this browser.');}});
+              }}
+            }}
+            </script>""",
+            height=38,
+        )
     with right:
         if st.button("🔄 Refresh"):
             st.cache_data.clear()
