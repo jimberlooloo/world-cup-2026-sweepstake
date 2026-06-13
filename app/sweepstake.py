@@ -49,8 +49,9 @@ st.markdown(
     "[data-testid='stHorizontalBlock'] button"
     "{padding:0.3rem 0.5rem!important;min-height:0!important;line-height:1!important;"
     "font-size:1.1rem!important;}"
-    "[data-testid='stHorizontalBlock'] [data-testid='stPopover']"
-    "{display:flex;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stPopover']{display:flex;}"
+    # Hide the chevron arrow on the popover button so it matches the other icon buttons
+    "[data-testid='stHorizontalBlock'] [data-testid='stPopover'] button svg{display:none!important;}"
     "</style>",
     unsafe_allow_html=True,
 )
@@ -335,15 +336,27 @@ UPDATES = [
     ("13 Jun", "📤 Share button — send a score snapshot to the group"),
     ("13 Jun", "🔴 Live match banner when a game is in progress"),
     ("12 Jun", "🏆 One trophy line per person on Fame & Shame cards"),
+    ("12 Jun", "💷 Prize money standings — see who's in the money"),
+    ("12 Jun", "🎖️ Trophy standings table in Fame & Shame"),
+    ("12 Jun", "🃏 New trophies: Super Sub, Penalty Villain, Ten Men, Mr Everything"),
+    ("12 Jun", "🟨 New trophies: Bad Boys, Seeing Red, Playmaker"),
+    ("12 Jun", "⚡ Live scores via ESPN — results update within minutes"),
+    ("11 Jun", "🏆 Fame & Shame — 34 trophies for every occasion"),
+    ("10 Jun", "🗓️ Wall chart — groups, knockouts and Golden Boot race"),
+    ("10 Jun", "🎉 Sweepstake launched — 16 players, 48 teams, one winner"),
 ]
 
 
 def header(b: dict) -> None:
     import json
     st.title("🏆 World Cup 2026")
-    left, share_col, updates_col, right = st.columns([4, 1, 1, 1], vertical_alignment="center")
+    left, refresh_col, share_col, updates_col = st.columns([4, 1, 1, 1], vertical_alignment="center")
     with left:
         st.markdown(f"**{b['played']}/{b['total']}** matches played")
+    with refresh_col:
+        if st.button("🔄", help="Refresh"):
+            st.cache_data.clear()
+            st.rerun()
     with share_col:
         share_json = json.dumps(_share_text(b))
         st.components.v1.html(
@@ -385,10 +398,6 @@ def header(b: dict) -> None:
         with st.popover("🆕", help="What's new"):
             for date, text in UPDATES:
                 st.markdown(f"**{date}** — {text}")
-    with right:
-        if st.button("🔄", help="Refresh"):
-            st.cache_data.clear()
-            st.rerun()
     next_match(b)
     if not b["is_real"]:
         st.info("Demo allocation (Player 1–16). Add real names in Secrets — see README.", icon="ℹ️")
