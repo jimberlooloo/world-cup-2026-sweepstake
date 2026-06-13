@@ -202,13 +202,56 @@ NEXT_CSS = """
 .nm-t2 { text-align:left; }
 .nm-fl { font-size:16px; }
 .nm-v { color:#5fae86; font-weight:700; font-size:12px; }
+.livm { border:1px solid #c0392b66; border-radius:12px; background:#2d0b0b;
+        padding:9px 14px; margin:2px 0 6px; }
+.lv-when { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px;
+           text-align:center; margin-bottom:6px; color:#ff6b6b; }
+.lv-dot { display:inline-block; width:7px; height:7px; border-radius:50%;
+          background:#ff4444; margin-right:5px;
+          animation:lv-pulse 1.4s ease-in-out infinite; }
+@keyframes lv-pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.lv-score { color:#fff; font-weight:900; font-size:22px; line-height:1; }
+.lv-hint { color:#c0392b99; font-size:10px; text-align:center; margin-top:5px;
+           font-style:italic; }
 </style>
 """
 
 
 def next_match(b: dict) -> None:
-    """Banner for the soonest unplayed match — teams, owners and UK kickoff time."""
+    """LIVE banner during a match; 'Next up' banner otherwise."""
     flags, owner, valid = b["flags"], b["owner"], b["_valid"]
+
+    def side(team: str) -> tuple[str, str, str]:
+        if team in valid:
+            return flags.get(team, ""), html.escape(str(team)), html.escape(owner.get(team, "—"))
+        return "", html.escape(str(team)), ""
+
+    live_matches = b.get("_live", [])
+    if live_matches:
+        cards = []
+        for lm in live_matches:
+            t1, t2 = lm["team1"], lm["team2"]
+            s1, s2 = lm["score"][0], lm["score"][1]
+            clock = html.escape(lm.get("clock", ""))
+            f1, n1, o1 = side(t1)
+            f2, n2, o2 = side(t2)
+            o1h = f"<small>{o1}</small>" if o1 else ""
+            o2h = f"<small>{o2}</small>" if o2 else ""
+            head = f'<span class="lv-dot"></span>LIVE' + (f" · {clock}" if clock else "")
+            cards.append(
+                '<div class="livm">'
+                + f'<div class="lv-when">{head}</div>'
+                + '<div class="nm-row">'
+                + f'<span class="nm-t nm-t1">{n1} <span class="nm-fl">{f1}</span>{o1h}</span>'
+                + f'<span class="lv-score">{s1}–{s2}</span>'
+                + f'<span class="nm-t nm-t2"><span class="nm-fl">{f2}</span> {n2}{o2h}</span>'
+                + "</div>"
+                + '<div class="lv-hint">Refresh for latest score</div>'
+                + "</div>"
+            )
+        st.markdown(NEXT_CSS + "".join(cards), unsafe_allow_html=True)
+        return
+
     upcoming = []
     for m in b["_matches"]:
         if feed._on_pitch(m.get("score")) is not None:
@@ -217,17 +260,11 @@ def next_match(b: dict) -> None:
         if ko is not None:
             upcoming.append((ko, m))
     if not upcoming:
-        return  # tournament finished / nothing scheduled
+        return
     ko, m = min(upcoming, key=lambda x: x[0])
     when = f"{ko.strftime('%a')} {ko.day} {ko.strftime('%b')} · {ko.strftime('%H:%M')}"
     label = m.get("group") or m.get("round") or ""
     head = f"⚽ Next up · {label} · {when}" if label else f"⚽ Next up · {when}"
-
-    def side(team: str) -> tuple[str, str, str]:
-        if team in valid:  # real team — show owner; unresolved KO slots stay bare
-            return flags.get(team, ""), html.escape(str(team)), html.escape(owner.get(team, "—"))
-        return "", html.escape(str(team)), ""
-
     f1, n1, o1 = side(m["team1"])
     f2, n2, o2 = side(m["team2"])
     o1h = f"<small>{o1}</small>" if o1 else ""
