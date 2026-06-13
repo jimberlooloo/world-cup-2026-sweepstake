@@ -53,7 +53,6 @@ st.markdown(
     "[data-testid='stHorizontalBlock'] button:hover"
     "{background:rgba(255,255,255,0.08)!important;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stPopover']{display:flex;}"
-    "[data-testid='stHorizontalBlock'] [data-testid='stPopover'] button svg{display:none!important;}"
     "</style>",
     unsafe_allow_html=True,
 )
@@ -348,6 +347,50 @@ UPDATES = [
     ("10 Jun", "🎉 Sweepstake launched — 16 players, 48 teams, one winner"),
 ]
 
+ADD_TO_HOME_HTML = """
+<style>
+  body{margin:0;background:transparent;font-family:system-ui,sans-serif;font-size:0.95rem;color:#fafafa;}
+  .tip{display:none;line-height:1.5;}
+  .tip b{color:#fff;}
+  .done{display:none;color:#4caf82;}
+</style>
+<div class="tip" id="ios">
+  Tap the <b>Share</b> button <b>&#x2B06;</b> in Safari then choose <b>Add to Home Screen</b>.
+</div>
+<div class="tip" id="android">
+  Tap the <b>&#8942;</b> menu in Chrome then choose <b>Add to Home Screen</b>.
+</div>
+<div class="tip" id="desktop">
+  Open this page on your phone to add it to your home screen.
+</div>
+<div class="done" id="installed">
+  ✅ Already on your home screen.
+</div>
+<script>
+  var ua=navigator.userAgent;
+  var standalone=window.navigator.standalone||window.matchMedia('(display-mode:standalone)').matches;
+  if(standalone){
+    document.getElementById('installed').style.display='block';
+  } else if(/iPhone|iPad|iPod/.test(ua)){
+    document.getElementById('ios').style.display='block';
+  } else if(/Android/.test(ua)){
+    document.getElementById('android').style.display='block';
+  } else {
+    document.getElementById('desktop').style.display='block';
+  }
+</script>
+"""
+
+
+@st.dialog("Settings")
+def settings_dialog() -> None:
+    st.markdown("### App updates")
+    for date, text in UPDATES:
+        st.markdown(f"**{date}** — {text}")
+    st.divider()
+    st.markdown("### Add to Home Screen")
+    st.components.v1.html(ADD_TO_HOME_HTML, height=60)
+
 
 def header(b: dict) -> None:
     import json
@@ -399,10 +442,8 @@ def header(b: dict) -> None:
             height=36,
         )
     with updates_col:
-        with st.popover("🆕", help="What's new"):
-            st.markdown("**App updates**")
-            for date, text in UPDATES:
-                st.markdown(f"**{date}** — {text}")
+        if st.button("⋮", help="Settings"):
+            settings_dialog()
     next_match(b)
     if not b["is_real"]:
         st.info("Demo allocation (Player 1–16). Add real names in Secrets — see README.", icon="ℹ️")
