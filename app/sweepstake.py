@@ -361,7 +361,8 @@ def header(b: dict) -> None:
         share_json = json.dumps(_share_text(b))
         st.components.v1.html(
             f"""<style>
-            body{{margin:0;background:transparent;display:flex;justify-content:flex-end;
+            html,body{{margin:0;padding:0;width:36px;overflow:hidden;}}
+            body{{background:transparent;display:flex;justify-content:center;
                  align-items:center;height:36px;}}
             button{{background:#1a1a2e;border:1px solid #555;border-radius:6px;
                    color:#fafafa;font-size:18px;padding:5px 9px;cursor:pointer;
@@ -396,6 +397,7 @@ def header(b: dict) -> None:
         )
     with updates_col:
         with st.popover("🆕", help="What's new"):
+            st.markdown("**App updates**")
             for date, text in UPDATES:
                 st.markdown(f"**{date}** — {text}")
     next_match(b)
