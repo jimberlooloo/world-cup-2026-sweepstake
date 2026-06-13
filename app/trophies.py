@@ -71,8 +71,16 @@ def biggest_thrashing(b: dict) -> dict:
             best.append((winner, detail))
     if not best:
         return {"status": "open"}
-    return {"status": "won", "holders": [owner.get(w, "—") for w, _ in best],
-            "teams": [w for w, _ in best], "detail": " · ".join(d for _, d in best)}
+    by_player: dict[str, list] = {}
+    for winner, detail in best:
+        p = owner.get(winner, "—")
+        by_player.setdefault(p, {"teams": [], "details": []})
+        by_player[p]["teams"].append(winner)
+        by_player[p]["details"].append(detail)
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player),
+            "holder_lines": holder_lines}
 
 
 def top_team(b: dict) -> dict:
@@ -81,8 +89,13 @@ def top_team(b: dict) -> dict:
     if top == 0:
         return {"status": "open"}
     teams = [t for t, g in goals.items() if g == top]
-    return {"status": "won", "holders": [owner.get(t, "—") for t in teams],
-            "teams": teams, "detail": " · ".join(f"{t} ({top})" for t in teams)}
+    by_player: dict[str, list] = {}
+    for t in teams:
+        p = owner.get(t, "—")
+        by_player.setdefault(p, []).append(t)
+    holder_lines = [{"holder": p, "teams": ts, "detail": " · ".join(f"{t} ({top})" for t in ts)}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def _reached_ko(b: dict, team: str) -> bool:
@@ -110,22 +123,28 @@ def total_wipeout(b: dict) -> dict:
 def bottlers(b: dict) -> dict:
     from data import _on_pitch
     owner = b["owner"]
-    holders, details = set(), []
+    by_player: dict[str, list] = {}
     for m in b["_matches"]:
         ft = _on_pitch(m.get("score"))
         ht = (m.get("score") or {}).get("ht")
         if ft is None or not ht:
             continue
         (a_ft, b_ft), (a_ht, b_ht) = ft, ht
-        if a_ht > b_ht and a_ft <= b_ft and owner.get(m["team1"]):  # led at HT, didn't win
-            holders.add(owner[m["team1"]])
-            details.append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
+        if a_ht > b_ht and a_ft <= b_ft and owner.get(m["team1"]):
+            p = owner[m["team1"]]
+            by_player.setdefault(p, {"teams": [], "details": []})
+            by_player[p]["teams"].append(m["team1"])
+            by_player[p]["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
         if b_ht > a_ht and b_ft <= a_ft and owner.get(m["team2"]):
-            holders.add(owner[m["team2"]])
-            details.append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
-    if not holders:
+            p = owner[m["team2"]]
+            by_player.setdefault(p, {"teams": [], "details": []})
+            by_player[p]["teams"].append(m["team2"])
+            by_player[p]["details"].append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def leaky_sieve(b: dict) -> dict:
@@ -142,8 +161,14 @@ def leaky_sieve(b: dict) -> dict:
     if worst == 0:
         return {"status": "open"}
     teams = [t for t, c in conceded.items() if c == worst]
-    return {"status": "won", "holders": [owner.get(t, "—") for t in teams],
-            "teams": teams, "detail": " · ".join(f"{t} ({worst} conceded)" for t in teams)}
+    by_player: dict[str, list] = {}
+    for t in teams:
+        p = owner.get(t, "—")
+        by_player.setdefault(p, []).append(t)
+    holder_lines = [{"holder": p, "teams": ts,
+                     "detail": " · ".join(f"{t} ({worst} conceded)" for t in ts)}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def bore_draw_king(b: dict) -> dict:
@@ -169,7 +194,7 @@ def bore_draw_king(b: dict) -> dict:
 def own_goal_king(b: dict) -> dict:
     from data import _on_pitch
     owner = b["owner"]
-    committed: dict[str, int] = {}  # own goal in the opponent's list = your team conceded it
+    committed: dict[str, int] = {}
     for m in b["_matches"]:
         if _on_pitch(m.get("score")) is None:
             continue
@@ -183,8 +208,13 @@ def own_goal_king(b: dict) -> dict:
         return {"status": "open"}
     most = max(committed.values())
     teams = [t for t, c in committed.items() if c == most]
-    return {"status": "won", "holders": [owner.get(t, "—") for t in teams],
-            "teams": teams, "detail": " · ".join(f"{t} ({most})" for t in teams)}
+    by_player: dict[str, list] = {}
+    for t in teams:
+        p = owner.get(t, "—")
+        by_player.setdefault(p, []).append(t)
+    holder_lines = [{"holder": p, "teams": ts, "detail": " · ".join(f"{t} ({most})" for t in ts)}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def wooden_spoon(b: dict) -> dict:
@@ -237,71 +267,85 @@ def _scored_in_match(goals_list: list) -> dict[str, int]:
 def hat_trick_hero(b: dict) -> dict:
     from data import _on_pitch
     owner = b["owner"]
-    holders, details = set(), []
+    by_player: dict[str, list] = {}
     for m in b["_matches"]:
         if _on_pitch(m.get("score")) is None:
             continue
         for team, gl in ((m["team1"], m.get("goals1")), (m["team2"], m.get("goals2"))):
             for nm, c in _scored_in_match(gl).items():
                 if c >= 3 and owner.get(team):
-                    holders.add(owner[team])
-                    details.append(f"{nm} ({c}) — {team}")
-    if not holders:
+                    p = owner[team]
+                    by_player.setdefault(p, {"teams": [], "details": []})
+                    by_player[p]["teams"].append(team)
+                    by_player[p]["details"].append(f"{nm} ({c}) — {team}")
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def giant_killer(b: dict) -> dict:
     from data import _on_pitch, _winner_loser
     owner = b["owner"]
-    holders, teams, details = set(), [], []
+    by_player: dict[str, list] = {}
     for m in b["_matches"]:
         sc = _on_pitch(m.get("score"))
         if sc is None or sc[0] == sc[1]:
             continue
         winner, loser = _winner_loser(m, sc)
         if loser in POT1 and winner not in POT1 and owner.get(winner):
-            holders.add(owner[winner])
-            teams.append(winner)
-            details.append(f"{winner} beat {loser}")
-    if not holders:
+            p = owner[winner]
+            by_player.setdefault(p, {"teams": [], "details": []})
+            by_player[p]["teams"].append(winner)
+            by_player[p]["details"].append(f"{winner} beat {loser}")
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "teams": teams,
-            "detail": " · ".join(details)}
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def cinderella(b: dict) -> dict:
-    holders, teams = set(), []
+    by_player: dict[str, list] = {}
     for p, ts in b["allocation"].items():
         for t in ts:
             if t in POT3 and _reached_ko(b, t):
-                holders.add(p)
-                teams.append(t)
-    if not holders:
+                by_player.setdefault(p, []).append(t)
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "teams": teams,
-            "detail": " · ".join(sorted(set(teams)))}
+    all_teams = [t for ts in by_player.values() for t in ts]
+    holder_lines = [{"holder": p, "teams": ts, "detail": " · ".join(sorted(ts))}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player),
+            "teams": all_teams, "holder_lines": holder_lines}
 
 
 def comeback_kings(b: dict) -> dict:
     from data import _on_pitch
     owner = b["owner"]
-    holders, details = set(), []
+    by_player: dict[str, list] = {}
     for m in b["_matches"]:
         ft = _on_pitch(m.get("score"))
         ht = (m.get("score") or {}).get("ht")
         if ft is None or not ht:
             continue
         (a_ft, b_ft), (a_ht, b_ht) = ft, ht
-        if a_ht < b_ht and a_ft > b_ft and owner.get(m["team1"]):  # trailed at HT, won
-            holders.add(owner[m["team1"]])
-            details.append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
+        if a_ht < b_ht and a_ft > b_ft and owner.get(m["team1"]):
+            p = owner[m["team1"]]
+            by_player.setdefault(p, {"teams": [], "details": []})
+            by_player[p]["teams"].append(m["team1"])
+            by_player[p]["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
         if b_ht < a_ht and b_ft > a_ft and owner.get(m["team2"]):
-            holders.add(owner[m["team2"]])
-            details.append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
-    if not holders:
+            p = owner[m["team2"]]
+            by_player.setdefault(p, {"teams": [], "details": []})
+            by_player[p]["teams"].append(m["team2"])
+            by_player[p]["details"].append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def golden_owner(b: dict) -> dict:
@@ -320,9 +364,16 @@ def golden_owner(b: dict) -> dict:
     if top == 0:
         return {"status": "open"}
     scorers = [nm for nm, c in tally.items() if c == top]
-    teams = [team_of[nm] for nm in scorers]
-    return {"status": "won", "holders": sorted({owner.get(t, "—") for t in teams}),
-            "teams": teams, "detail": " · ".join(f"{nm} ({top}) — {team_of[nm]}" for nm in scorers)}
+    by_player: dict[str, list] = {}
+    for nm in scorers:
+        t = team_of[nm]
+        p = owner.get(t, "—")
+        by_player.setdefault(p, {"teams": [], "details": []})
+        by_player[p]["teams"].append(t)
+        by_player[p]["details"].append(f"{nm} ({top}) — {t}")
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def one_trick_pony(b: dict) -> dict:
@@ -403,17 +454,24 @@ def rollercoaster(b: dict) -> dict:
             items.append(m)
     if best < 1:
         return {"status": "open"}
-    holders, teams, details = set(), [], []
+    by_player: dict[str, list] = {}
     for m in items:
         sc = _on_pitch(m.get("score"))
+        match_detail = f"{m['team1']} {sc[0]}–{sc[1]} {m['team2']} (lead changed {best}×)"
         for t in (m["team1"], m["team2"]):
             if owner.get(t):
-                holders.add(owner[t])
-                teams.append(t)
-        details.append(f"{m['team1']} {sc[0]}–{sc[1]} {m['team2']} (lead changed {best}×)")
-    if not holders:
+                p = owner[t]
+                by_player.setdefault(p, {"teams": [], "details": []})
+                by_player[p]["teams"].append(t)
+                if match_detail not in by_player[p]["details"]:
+                    by_player[p]["details"].append(match_detail)
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "teams": teams, "detail": " · ".join(details)}
+    all_teams = [t for v in by_player.values() for t in v["teams"]]
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player),
+            "teams": all_teams, "holder_lines": holder_lines}
 
 
 def the_full_set(b: dict) -> dict:
@@ -520,8 +578,13 @@ def pointless(b: dict) -> dict:
              if r["pts"] == 0 and owner.get(r["team"])]
     if not teams:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted({owner[t] for t in teams}),
-            "teams": teams, "detail": " · ".join(teams)}
+    by_player: dict[str, list] = {}
+    for t in teams:
+        by_player.setdefault(owner[t], []).append(t)
+    holder_lines = [{"holder": p, "teams": ts, "detail": " · ".join(ts)}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player),
+            "teams": teams, "holder_lines": holder_lines}
 
 
 def goal_shy(b: dict) -> dict:
@@ -532,8 +595,13 @@ def goal_shy(b: dict) -> dict:
              if r["gf"] == 0 and owner.get(r["team"])]
     if not teams:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted({owner[t] for t in teams}),
-            "teams": teams, "detail": " · ".join(teams)}
+    by_player: dict[str, list] = {}
+    for t in teams:
+        by_player.setdefault(owner[t], []).append(t)
+    holder_lines = [{"holder": p, "teams": ts, "detail": " · ".join(ts)}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player),
+            "teams": teams, "holder_lines": holder_lines}
 
 
 def sitting_duck(b: dict) -> dict:
@@ -573,8 +641,16 @@ def whipping_boys(b: dict) -> dict:
             details.append(detail)
     if not losers:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted({owner.get(x, "—") for x in losers}),
-            "teams": losers, "detail": " · ".join(details)}
+    by_player: dict[str, list] = {}
+    for loser, detail in zip(losers, details):
+        p = owner.get(loser, "—")
+        by_player.setdefault(p, {"teams": [], "details": []})
+        by_player[p]["teams"].append(loser)
+        by_player[p]["details"].append(detail)
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player),
+            "teams": losers, "holder_lines": holder_lines}
 
 
 def playmaker(b: dict) -> dict:
@@ -592,14 +668,21 @@ def playmaker(b: dict) -> dict:
     if top == 0:
         return {"status": "open"}
     makers = [a for a, c in tally.items() if c == top]
-    teams = [team_of[a] for a in makers]
-    return {"status": "won", "holders": sorted({owner.get(t, "—") for t in teams}),
-            "teams": teams, "detail": " · ".join(f"{a} ({top}) — {team_of[a]}" for a in makers)}
+    by_player: dict[str, list] = {}
+    for a in makers:
+        t = team_of[a]
+        p = owner.get(t, "—")
+        by_player.setdefault(p, {"teams": [], "details": []})
+        by_player[p]["teams"].append(t)
+        by_player[p]["details"].append(f"{a} ({top}) — {t}")
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def super_sub(b: dict) -> dict:
     owner = b["owner"]
-    holders, details = set(), []
+    by_player: dict[str, list] = {}
     for m in b["_matches"]:
         for goals, team in ((m.get("goals1"), m["team1"]), (m.get("goals2"), m["team2"])):
             p = owner.get(team)
@@ -607,17 +690,20 @@ def super_sub(b: dict) -> dict:
                 continue
             for g in (goals or []):
                 if g.get("sub") and not g.get("owngoal"):
-                    holders.add(p)
-                    details.append(f"{g.get('name', '?')} ({team})")
-    if not holders:
+                    by_player.setdefault(p, {"teams": [], "details": []})
+                    by_player[p]["teams"].append(team)
+                    by_player[p]["details"].append(f"{g.get('name', '?')} ({team})")
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def ten_men(b: dict) -> dict:
     from data import _on_pitch, _winner_loser
     owner = b["owner"]
-    holders, details = set(), []
+    by_player: dict[str, list] = {}
     for m in b["_matches"]:
         sc = _on_pitch(m.get("score"))
         if sc is None:
@@ -628,11 +714,14 @@ def ten_men(b: dict) -> dict:
             if not p:
                 continue
             if any(c.get("type") == "red" for c in (cards or [])) and team != loser:
-                holders.add(p)
-                details.append(f"{team} ({'won' if team == winner else 'drew'} with 10)")
-    if not holders:
+                by_player.setdefault(p, {"teams": [], "details": []})
+                by_player[p]["teams"].append(team)
+                by_player[p]["details"].append(f"{team} ({'won' if team == winner else 'drew'} with 10)")
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def mr_everything(b: dict) -> dict:
@@ -652,25 +741,35 @@ def mr_everything(b: dict) -> dict:
     if top == 0:
         return {"status": "open"}
     best = [nm for nm, c in tally.items() if c == top]
-    teams = [team_of[nm] for nm in best]
-    return {"status": "won", "holders": sorted({owner.get(t, "—") for t in teams}),
-            "teams": teams, "detail": " · ".join(f"{nm} ({top}) — {team_of[nm]}" for nm in best)}
+    by_player: dict[str, list] = {}
+    for nm in best:
+        t = team_of[nm]
+        p = owner.get(t, "—")
+        by_player.setdefault(p, {"teams": [], "details": []})
+        by_player[p]["teams"].append(t)
+        by_player[p]["details"].append(f"{nm} ({top}) — {t}")
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def penalty_villain(b: dict) -> dict:
     owner = b["owner"]
-    holders, details = set(), []
+    by_player: dict[str, list] = {}
     for m in b["_matches"]:
         for misses, team in ((m.get("pen_misses1"), m["team1"]), (m.get("pen_misses2"), m["team2"])):
             p = owner.get(team)
             if not p:
                 continue
             for pm in (misses or []):
-                holders.add(p)
-                details.append(f"{pm.get('name', '?')} ({team})")
-    if not holders:
+                by_player.setdefault(p, {"teams": [], "details": []})
+                by_player[p]["teams"].append(team)
+                by_player[p]["details"].append(f"{pm.get('name', '?')} ({team})")
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 def bad_boys(b: dict) -> dict:
@@ -693,7 +792,7 @@ def bad_boys(b: dict) -> dict:
 
 def seeing_red(b: dict) -> dict:
     owner = b["owner"]
-    holders, details = set(), []
+    by_player: dict[str, list] = {}
     for m in b["_matches"]:
         for cards, team in ((m.get("cards1"), m["team1"]), (m.get("cards2"), m["team2"])):
             p = owner.get(team)
@@ -701,11 +800,17 @@ def seeing_red(b: dict) -> dict:
                 continue
             for c in (cards or []):
                 if c.get("type") == "red":
-                    holders.add(p)
-                    details.append(f"{c.get('name', '?')} ({team})")
-    if not holders:
+                    by_player.setdefault(p, {"teams": [], "names_by_team": {}})
+                    by_player[p]["teams"].append(team)
+                    by_player[p]["names_by_team"].setdefault(team, []).append(c.get("name", "?"))
+    if not by_player:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+    holder_lines = []
+    for p, v in sorted(by_player.items()):
+        teams = list(dict.fromkeys(v["teams"]))  # deduped, order preserved
+        parts = [f"{', '.join(names)} ({t})" for t, names in v["names_by_team"].items()]
+        holder_lines.append({"holder": p, "teams": teams, "detail": " · ".join(parts)})
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
 AWARDS = [
@@ -786,9 +891,17 @@ def _card(award: dict, res: dict, flags: dict) -> str:
             f'<div class="tr-bl">{_esc(award["blurb"])}</div>')
     if res.get("status") != "won":
         return f'<div class="trophy{booby}">{head}<div class="tr-open">Up for grabs…</div></div>'
-    holders = ", ".join(res["holders"])
-    fl = " ".join(flags.get(t, "") for t in res.get("teams", []))
-    line = f'🏆 <b>{_esc(holders)}</b> · {fl} {_esc(res.get("detail", ""))}'.strip()
+    if "holder_lines" in res:
+        parts = []
+        for hl in res["holder_lines"]:
+            fl = " ".join(flags.get(t, "") for t in hl.get("teams", []))
+            tail = (f" · {fl} " if fl else " ") + _esc(hl.get("detail", ""))
+            parts.append(f'🏆 <b>{_esc(hl["holder"])}</b>{tail.rstrip()}')
+        line = "<br>".join(parts)
+    else:
+        holders = ", ".join(res["holders"])
+        fl = " ".join(flags.get(t, "") for t in res.get("teams", []))
+        line = f'🏆 <b>{_esc(holders)}</b> · {fl} {_esc(res.get("detail", ""))}'.strip()
     return f'<div class="trophy{booby} won">{head}<div class="tr-win">{line}</div></div>'
 
 
