@@ -49,8 +49,9 @@ st.markdown(
     "[data-testid='stHorizontalBlock'] button"
     "{padding:0.3rem 0.5rem!important;min-height:0!important;line-height:1!important;"
     "font-size:1.1rem!important;}"
-    "[data-testid='stHorizontalBlock'] [data-testid='stPopover']"
-    "{display:flex;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stPopover']{display:flex;}"
+    # Hide the chevron arrow on the popover button so it matches the other icon buttons
+    "[data-testid='stHorizontalBlock'] [data-testid='stPopover'] button svg{display:none!important;}"
     "</style>",
     unsafe_allow_html=True,
 )
@@ -341,9 +342,13 @@ UPDATES = [
 def header(b: dict) -> None:
     import json
     st.title("🏆 World Cup 2026")
-    left, share_col, updates_col, right = st.columns([4, 1, 1, 1], vertical_alignment="center")
+    left, refresh_col, share_col, updates_col = st.columns([4, 1, 1, 1], vertical_alignment="center")
     with left:
         st.markdown(f"**{b['played']}/{b['total']}** matches played")
+    with refresh_col:
+        if st.button("🔄", help="Refresh"):
+            st.cache_data.clear()
+            st.rerun()
     with share_col:
         share_json = json.dumps(_share_text(b))
         st.components.v1.html(
@@ -385,10 +390,6 @@ def header(b: dict) -> None:
         with st.popover("🆕", help="What's new"):
             for date, text in UPDATES:
                 st.markdown(f"**{date}** — {text}")
-    with right:
-        if st.button("🔄", help="Refresh"):
-            st.cache_data.clear()
-            st.rerun()
     next_match(b)
     if not b["is_real"]:
         st.info("Demo allocation (Player 1–16). Add real names in Secrets — see README.", icon="ℹ️")
