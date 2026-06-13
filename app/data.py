@@ -277,6 +277,15 @@ def team_status(
     return status
 
 
+def fetch_live() -> list[dict]:
+    """Currently in-progress matches from ESPN, each {team1, team2, score:[s1,s2], clock}."""
+    try:
+        import espn
+        return espn.fetch_live()
+    except Exception:
+        return []
+
+
 def overall(teams: list[dict], matches: list[dict]) -> dict:
     """One bundle the app renders from."""
     standings = group_standings(matches)
@@ -292,4 +301,5 @@ def overall(teams: list[dict], matches: list[dict]) -> dict:
         "total": len(matches),
         "_matches": matches,  # raw feed, for the wall-chart bracket
         "_valid": valid,
+        "_live": fetch_live(),
     }

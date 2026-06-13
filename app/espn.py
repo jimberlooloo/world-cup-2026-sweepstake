@@ -128,6 +128,42 @@ def parse_summary(summary: dict) -> dict | None:
             "score_by_team": {nm: per(nm) for nm in names}}
 
 
+def fetch_live() -> list[dict]:
+    """Return one dict per currently in-progress match.
+
+    Hits only the scoreboard endpoint (no per-event fetch), so it's cheap. Each entry:
+      {team1, team2, score: [s1, s2], clock: "67'"}
+    clock comes from status.type.shortDetail which ESPN sets to strings like "67'",
+    "Half Time", "Extra Time" etc.
+    """
+    live = []
+    for rng in ("20260611-20260628", "20260629-20260719"):
+        try:
+            resp = requests.get(f"{ESPN}/scoreboard?dates={rng}", timeout=10)
+            resp.raise_for_status()
+            events = resp.json().get("events", [])
+        except requests.RequestException:
+            continue
+        for e in events:
+            state = ((e.get("status") or {}).get("type") or {}).get("state")
+            if state != "in":
+                continue
+            cps = (e.get("competitions") or [{}])[0].get("competitors", [])
+            if len(cps) != 2:
+                continue
+            names, scores = [], []
+            for c in cps:
+                names.append(_name((c.get("team") or {}).get("displayName", "")))
+                try:
+                    scores.append(int(c.get("score") or 0))
+                except (ValueError, TypeError):
+                    scores.append(0)
+            clock = ((e.get("status") or {}).get("type") or {}).get("shortDetail", "")
+            live.append({"team1": names[0], "team2": names[1],
+                         "score": scores, "clock": clock})
+    return live
+
+
 def fetch_results() -> dict:
     """Return {frozenset({teamA, teamB}): parsed_summary} for every started ESPN match."""
     events = []
