@@ -45,6 +45,12 @@ st.markdown(
     "{display:flex;justify-content:flex-end;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:nth-last-child(3)"
     "{display:flex;justify-content:flex-end;}"
+    # Compact icon buttons — only the header row has st.columns, so this is safe
+    "[data-testid='stHorizontalBlock'] button"
+    "{padding:0.3rem 0.5rem!important;min-height:0!important;line-height:1!important;"
+    "font-size:1.1rem!important;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stPopover']"
+    "{display:flex;}"
     "</style>",
     unsafe_allow_html=True,
 )
@@ -343,14 +349,16 @@ def header(b: dict) -> None:
         st.components.v1.html(
             f"""<style>
             body{{margin:0;background:transparent;display:flex;justify-content:flex-end;
-                 align-items:center;height:38px;}}
-            button{{background:transparent;border:1px solid #555;border-radius:6px;
-                   color:#fafafa;font-size:14px;padding:4px 10px;cursor:pointer;
-                   white-space:nowrap;font-family:system-ui,sans-serif;}}
-            button:active{{background:#ffffff22;}}
+                 align-items:center;height:36px;}}
+            button{{background:#1a1a2e;border:1px solid #555;border-radius:6px;
+                   color:#fafafa;font-size:18px;padding:5px 9px;cursor:pointer;
+                   line-height:1;font-family:system-ui,sans-serif;display:flex;
+                   align-items:center;justify-content:center;}}
+            button:hover{{border-color:#888;background:#2a2a3e;}}
+            button:active{{background:#3a3a4e;}}
             </style>
             <button onclick="share()" title="Share">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                 fill="none" stroke="currentColor" stroke-width="2.2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
@@ -371,7 +379,7 @@ def header(b: dict) -> None:
               }}
             }}
             </script>""",
-            height=38,
+            height=36,
         )
     with updates_col:
         with st.popover("🆕", help="What's new"):
