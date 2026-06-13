@@ -43,6 +43,8 @@ st.markdown(
     "{display:flex;justify-content:flex-end;}"
     "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:nth-last-child(2)"
     "{display:flex;justify-content:flex-end;}"
+    "[data-testid='stHorizontalBlock'] [data-testid='stColumn']:nth-last-child(3)"
+    "{display:flex;justify-content:flex-end;}"
     "</style>",
     unsafe_allow_html=True,
 )
@@ -322,13 +324,21 @@ def _share_text(b: dict) -> str:
     return "\n".join(lines)
 
 
+# Newest first. Keep generic — no real names, no personal content.
+UPDATES = [
+    ("13 Jun", "📤 Share button — send a score snapshot to the group"),
+    ("13 Jun", "🔴 Live match banner when a game is in progress"),
+    ("12 Jun", "🏆 One trophy line per person on Fame & Shame cards"),
+]
+
+
 def header(b: dict) -> None:
     import json
     st.title("🏆 World Cup 2026")
-    left, mid, right = st.columns([3, 1, 1], vertical_alignment="center")
+    left, share_col, updates_col, right = st.columns([4, 1, 1, 1], vertical_alignment="center")
     with left:
         st.markdown(f"**{b['played']}/{b['total']}** matches played")
-    with mid:
+    with share_col:
         share_json = json.dumps(_share_text(b))
         st.components.v1.html(
             f"""<style>
@@ -339,15 +349,14 @@ def header(b: dict) -> None:
                    white-space:nowrap;font-family:system-ui,sans-serif;}}
             button:active{{background:#ffffff22;}}
             </style>
-            <button onclick="share()">
+            <button onclick="share()" title="Share">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                 fill="none" stroke="currentColor" stroke-width="2.2"
-                stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px">
+                stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
                 <polyline points="16 6 12 2 8 6"/>
                 <line x1="12" y1="2" x2="12" y2="15"/>
               </svg>
-              Share
             </button>
             <script>
             function share(){{
@@ -364,8 +373,12 @@ def header(b: dict) -> None:
             </script>""",
             height=38,
         )
+    with updates_col:
+        with st.popover("🆕", help="What's new"):
+            for date, text in UPDATES:
+                st.markdown(f"**{date}** — {text}")
     with right:
-        if st.button("🔄 Refresh"):
+        if st.button("🔄", help="Refresh"):
             st.cache_data.clear()
             st.rerun()
     next_match(b)
