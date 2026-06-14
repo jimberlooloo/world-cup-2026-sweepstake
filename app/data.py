@@ -74,8 +74,12 @@ def _overlay_espn(matches: list[dict]) -> None:
         if "ft" not in score and "et" not in score:
             continue  # not enough to call it played
         m["score"] = score
-        m["goals1"] = ov["goals"].get(t1, [])
-        m["goals2"] = ov["goals"].get(t2, [])
+        # Prefer openfootball goal events (more accurate); fall back to ESPN only
+        # when openfootball has no goal-scorer data yet (empty goals on a played match).
+        of_has_goals = m.get("goals1") or m.get("goals2")
+        if not of_has_goals:
+            m["goals1"] = ov["goals"].get(t1, [])
+            m["goals2"] = ov["goals"].get(t2, [])
         m["cards1"] = ov.get("cards", {}).get(t1, [])
         m["cards2"] = ov.get("cards", {}).get(t2, [])
         m["pen_misses1"] = ov.get("pen_misses", {}).get(t1, [])
