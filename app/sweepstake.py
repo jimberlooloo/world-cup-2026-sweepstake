@@ -474,6 +474,9 @@ PLAYERS_CSS = """
 .pc-row .g { color:#ffd84d; font-weight:700; font-size:14px;
              min-width:34px; text-align:right; white-space:nowrap; }
 .pl-legend { color:#8a8a96; font-size:11px; margin:2px 2px 0; }
+.pc-next { padding:6px 14px 8px; border-top:1px solid #ffffff10;
+           color:#8a8a96; font-size:12px; }
+.pc-next b { color:#c8c8d4; font-weight:600; }
 </style>
 """
 
@@ -487,6 +490,28 @@ def _status_dot(s: dict | None) -> str:
     if s.get("phase") == "ko":
         return "🟢"
     return "⚪"
+
+
+def _player_next(teams: list[str], b: dict) -> str:
+    """Return a formatted 'Next: ...' string for this player's soonest unplayed match."""
+    team_set = set(teams)
+    upcoming = []
+    for m in b.get("_matches", []):
+        if {m.get("team1"), m.get("team2")} & team_set:
+            if feed._on_pitch(m.get("score")) is not None:
+                continue  # already played
+            ko = feed._uk_kickoff(m.get("date", ""), m.get("time", ""))
+            if ko is not None:
+                upcoming.append((ko, m))
+    if not upcoming:
+        return ""
+    ko, m = min(upcoming, key=lambda x: x[0])
+    flags = b.get("flags", {})
+    f1 = flags.get(m["team1"], "")
+    f2 = flags.get(m["team2"], "")
+    when = f"{ko.strftime('%a')} {ko.day} {ko.strftime('%b')} · {ko.strftime('%H:%M')}"
+    teams_str = f"{f1} {html.escape(str(m['team1']))} v {f2} {html.escape(str(m['team2']))}"
+    return f'<div class="pc-next">⚽ Next: <b>{teams_str}</b> · {when}</div>'
 
 
 def _player_card(rank: int, player: str, teams: list[str], total: int,
@@ -506,7 +531,9 @@ def _player_card(rank: int, player: str, teams: list[str], total: int,
         f'<div class="{cls}"><div class="pc-h">'
         f'<span class="nm">{rank}. {html.escape(str(player))}{badge}</span>'
         f'<span class="tot">{total} ⚽</span></div>'
-        + "".join(rows) + "</div>"
+        + "".join(rows)
+        + _player_next(teams, b)
+        + "</div>"
     )
 
 
