@@ -334,6 +334,7 @@ def _share_text(b: dict) -> str:
 
 # Newest first. Keep generic — no real names, no personal content.
 UPDATES = [
+    ("16 Jun", "📅 Next match shown on each player's card"),
     ("13 Jun", "📤 Share button — send a score snapshot to the group"),
     ("13 Jun", "🔴 Live match banner when a game is in progress"),
     ("12 Jun", "🏆 One trophy line per person on Fame & Shame cards"),
