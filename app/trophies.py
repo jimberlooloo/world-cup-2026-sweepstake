@@ -545,6 +545,32 @@ def the_entertainers(b: dict) -> dict:
             "detail": f"{top} goals in their games (scored + conceded)"}
 
 
+def first_out_group(b: dict) -> dict:
+    """First team(s) eliminated from the group stage — fewest points among non-qualifiers,
+    ties broken by goal difference then goals scored. Settled once the group stage is done."""
+    if not _group_done(b):
+        return {"status": "open"}
+    owner = b["owner"]
+    eliminated = [r for rows in b["standings"].values() for r in rows
+                  if not (b["status"].get(r["team"]) or {}).get("alive", True)
+                  and owner.get(r["team"])]
+    if not eliminated:
+        return {"status": "open"}
+    worst_pts = min(r["pts"] for r in eliminated)
+    worst_gd  = min(r["gd"]  for r in eliminated if r["pts"] == worst_pts)
+    worst_gf  = min(r["gf"]  for r in eliminated if r["pts"] == worst_pts and r["gd"] == worst_gd)
+    teams = [r["team"] for r in eliminated
+             if r["pts"] == worst_pts and r["gd"] == worst_gd and r["gf"] == worst_gf]
+    by_player: dict[str, list] = {}
+    for t in teams:
+        by_player.setdefault(owner[t], []).append(t)
+    holder_lines = [{"holder": p, "teams": ts,
+                     "detail": " · ".join(f"{t} ({worst_pts}pts, {worst_gd:+}GD)" for t in ts)}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player),
+            "teams": teams, "holder_lines": holder_lines}
+
+
 def first_to_fall(b: dict) -> dict:
     from datetime import datetime
 
@@ -841,6 +867,7 @@ AWARDS = [
     {"icon": "🤦", "name": "Own Goal King", "blurb": "Your teams scored the most own goals", "fn": own_goal_king, "booby": True},
     {"icon": "🐴", "name": "One-Trick Pony", "blurb": "All your goals come from a single team (once all 3 have played)", "fn": one_trick_pony, "booby": True},
     {"icon": "🪦", "name": "First to Fall", "blurb": "Own the first team knocked out in the knockouts", "fn": first_to_fall, "booby": True},
+    {"icon": "🚪", "name": "First Out", "blurb": "Own the first team eliminated from the group stage (fewest points, worst record)", "fn": first_out_group, "booby": True},
     {"icon": "🅿️", "name": "Pointless", "blurb": "One of your teams finishes the groups on 0 points", "fn": pointless, "booby": True},
     {"icon": "🤐", "name": "Goal Shy", "blurb": "One of your teams fails to score in the group stage", "fn": goal_shy, "booby": True},
     {"icon": "🦆", "name": "Sitting Duck", "blurb": "Own the team that concedes the fastest goal", "fn": sitting_duck, "booby": True},
