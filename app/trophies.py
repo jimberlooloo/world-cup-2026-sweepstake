@@ -833,7 +833,7 @@ AWARDS = [
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
     {"icon": "🔥", "name": "Super Sub", "blurb": "A substitute on one of your teams comes on and scores", "fn": super_sub},
     {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
-    {"icon": "🥄", "name": "Wooden Spoon", "blurb": "Fewest combined goals (settled after the group stage)", "fn": wooden_spoon, "booby": True},
+    {"icon": "🍫", "name": "Chocolate Bar", "blurb": "Fewest combined goals (settled after the group stage)", "fn": wooden_spoon, "booby": True},
     {"icon": "🪣", "name": "Total Wipeout", "blurb": "All three of your teams out in the group stage", "fn": total_wipeout, "booby": True},
     {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
     {"icon": "🕳️", "name": "Leaky Sieve", "blurb": "Your team conceded the most goals", "fn": leaky_sieve, "booby": True},
