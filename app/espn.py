@@ -97,10 +97,14 @@ def parse_summary(summary: dict) -> dict | None:
         minute, offset = _minute_parts((e.get("clock") or {}).get("displayValue", ""))
         if "Goal" in ttype or ttype == "Penalty - Scored":
             assist = ((parts[1].get("athlete") or {}).get("displayName", "")) if len(parts) > 1 else ""
-            goals[tnm].append({
+            is_og = "Own Goal" in ttype
+            # ESPN assigns own goal events to the team that benefited (the attacking side).
+            # We store them under the conceding team so own_goal_king attributes them correctly.
+            dest = [n for n in names if n != tnm][0] if is_og and len(names) == 2 else tnm
+            goals[dest].append({
                 "name": player, "assist": assist, "minute": minute, "offset": offset,
                 "penalty": ttype == "Penalty - Scored",
-                "owngoal": "Own Goal" in ttype,
+                "owngoal": is_og,
                 "sub": player in subbed_in.get(tnm, set()),
             })
         elif ttype in ("Yellow Card", "Red Card"):
