@@ -143,14 +143,16 @@ MONEY_CSS = """
 
 
 def _choc_holders(b: dict) -> list[str]:
-    """Current fewest-goals player(s) — only shown once the group stage is complete."""
+    """Fewest-goals player(s) — always show current leader, not just post-group-stage."""
     try:
-        result = trophies.wooden_spoon(b)
-        if (result or {}).get("status") == "won":
-            return result.get("holders", [])
+        totals = [(p, sum(b["goals"].get(t, 0) for t in ts))
+                  for p, ts in b["allocation"].items()]
+        if not totals:
+            return []
+        low = min(v for _, v in totals)
+        return sorted(p for p, v in totals if v == low)
     except Exception:
-        pass
-    return []
+        return []
 
 
 def render_money(b: dict) -> None:
@@ -178,7 +180,7 @@ def render_money(b: dict) -> None:
         ("👟 Golden Boot", 6, "3 teams' most combined goals", "no goals yet", gb),
         ("🌟 Hall of Fame", 6, "most fame trophies", "up for grabs", hall_leaders(fame_tally)),
         ("🙈 Hall of Shame", 3, "most shame trophies (£3 back)", "up for grabs", hall_leaders(shame_tally)),
-        ("🍫 Chocolate Bar", None, "fewest combined goals", "settled after the group stage", _choc_holders(b)),
+        ("🍫 Chocolate Bar", None, "fewest goals so far (settled after group stage)", "no goals yet", _choc_holders(b)),
     ]
 
     money: dict[str, float] = {}
