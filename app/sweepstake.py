@@ -142,6 +142,17 @@ MONEY_CSS = """
 """
 
 
+def _choc_holders(b: dict) -> list[str]:
+    """Current fewest-goals player(s) — only shown once the group stage is complete."""
+    try:
+        result = trophies.wooden_spoon(b)
+        if (result or {}).get("status") == "won":
+            return result.get("holders", [])
+    except Exception:
+        pass
+    return []
+
+
 def render_money(b: dict) -> None:
     """Consolidated 'who's winning' view — current leader of every cash prize plus each
     player's provisional winnings (ties split the prize; placings stay TBD until decided)."""
@@ -167,20 +178,23 @@ def render_money(b: dict) -> None:
         ("👟 Golden Boot", 6, "3 teams' most combined goals", "no goals yet", gb),
         ("🌟 Hall of Fame", 6, "most fame trophies", "up for grabs", hall_leaders(fame_tally)),
         ("🙈 Hall of Shame", 3, "most shame trophies (£3 back)", "up for grabs", hall_leaders(shame_tally)),
+        ("🍫 Chocolate Bar", None, "fewest combined goals", "settled after the group stage", _choc_holders(b)),
     ]
 
     money: dict[str, float] = {}
     rows = []
     for name, amt, rule, tbd, holders in prizes:
         if holders:
-            for h in holders:
-                money[h] = money.get(h, 0) + amt / len(holders)
+            if amt:
+                for h in holders:
+                    money[h] = money.get(h, 0) + amt / len(holders)
             line = (f'<div class="mn-who">{html.escape(rule)} · '
                     f'{", ".join(html.escape(h) for h in holders)}</div>')
         else:
             line = f'<div class="mn-tbd">{html.escape(rule)} · {html.escape(tbd)}</div>'
+        amt_str = f"£{amt}" if amt else "🍫"
         rows.append(f'<div class="mn-row"><div class="mn-top"><span class="mn-prize">'
-                    f'{name}</span><span class="mn-amt">£{amt}</span></div>{line}</div>')
+                    f'{name}</span><span class="mn-amt">{amt_str}</span></div>{line}</div>')
 
     def fmt(x: float) -> str:
         return f"£{x:.0f}" if x == int(x) else f"£{x:.2f}"
@@ -334,6 +348,7 @@ def _share_text(b: dict) -> str:
 
 # Newest first. Keep generic — no real names, no personal content.
 UPDATES = [
+    ("22 Jun", "🍫 Wooden Spoon renamed to Chocolate Bar, added to prize list"),
     ("16 Jun", "📅 Next match shown on each player's card"),
     ("13 Jun", "📤 Share button — send a score snapshot to the group"),
     ("13 Jun", "🔴 Live match banner when a game is in progress"),
