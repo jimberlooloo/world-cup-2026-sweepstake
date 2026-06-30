@@ -121,9 +121,10 @@ def total_wipeout(b: dict) -> dict:
 
 
 def bottlers(b: dict) -> dict:
+    """Player whose 3 teams have bottled the most leads (led at HT, failed to win)."""
     from data import _on_pitch
     owner = b["owner"]
-    by_player: dict[str, list] = {}
+    by_player: dict[str, dict] = {}
     for m in b["_matches"]:
         ft = _on_pitch(m.get("score"))
         ht = (m.get("score") or {}).get("ht")
@@ -132,19 +133,26 @@ def bottlers(b: dict) -> dict:
         (a_ft, b_ft), (a_ht, b_ht) = ft, ht
         if a_ht > b_ht and a_ft <= b_ft and owner.get(m["team1"]):
             p = owner[m["team1"]]
-            by_player.setdefault(p, {"teams": [], "details": []})
-            by_player[p]["teams"].append(m["team1"])
-            by_player[p]["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
+            entry = by_player.setdefault(p, {"count": 0, "teams": set(), "details": []})
+            entry["count"] += 1
+            entry["teams"].add(m["team1"])
+            entry["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
         if b_ht > a_ht and b_ft <= a_ft and owner.get(m["team2"]):
             p = owner[m["team2"]]
-            by_player.setdefault(p, {"teams": [], "details": []})
-            by_player[p]["teams"].append(m["team2"])
-            by_player[p]["details"].append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
+            entry = by_player.setdefault(p, {"count": 0, "teams": set(), "details": []})
+            entry["count"] += 1
+            entry["teams"].add(m["team2"])
+            entry["details"].append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
     if not by_player:
         return {"status": "open"}
-    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
-                    for p, v in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+    worst = max(v["count"] for v in by_player.values())
+    losers = {p: v for p, v in by_player.items() if v["count"] == worst}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"{worst} bottle{'s' if worst != 1 else ''} · " + " · ".join(v["details"])}
+        for p, v in sorted(losers.items())
+    ]
+    return {"status": "won", "holders": sorted(losers), "holder_lines": holder_lines}
 
 
 def leaky_sieve(b: dict) -> dict:
