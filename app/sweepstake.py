@@ -202,7 +202,7 @@ def render_money(b: dict) -> None:
         fav = favourites.get(name)
         if fav:
             # fav is "Team (odds)" — extract team to find owner
-            fav_team = fav.split(" (")[0]
+            fav_team = fav.split(" · ")[0]
             fav_owner = owner.get(fav_team, "")
             owner_str = f" · owned by {fav_owner}" if fav_owner else ""
             fav_html = (f'<span class="mn-fav">🎰 Bookies fav: {html.escape(fav)}{html.escape(owner_str)}</span>')

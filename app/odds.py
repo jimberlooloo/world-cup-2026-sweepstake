@@ -79,9 +79,7 @@ def fetch_favourites() -> dict[str, str] | None:
     ranked = sorted(prob.items(), key=lambda kv: -kv[1])
 
     def fmt(team: str, p: float) -> str:
-        # Convert implied prob back to fractional-ish display odds
-        decimal = round(1 / p, 1) if p > 0 else 0
-        return f"{team} ({decimal})"
+        return f"{team} · {round(p * 100)}% chance"
 
     result = {}
     if len(ranked) >= 1:
