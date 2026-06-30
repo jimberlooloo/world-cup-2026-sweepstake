@@ -366,6 +366,49 @@ def giant_slain(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
+def ranking_spanking(b: dict) -> dict:
+    """Biggest ranking gap where the lower-ranked team beat the higher-ranked team."""
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    _rank = {t: i for i, t in enumerate(_RANKING)}
+    best_gap, best_matches = -1, []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        winner, loser = _winner_loser(m, sc)
+        if not winner or not loser:
+            continue
+        wr, lr = _rank.get(winner, -1), _rank.get(loser, -1)
+        if wr < 0 or lr < 0:
+            continue
+        gap = wr - lr  # positive = lower-ranked team beat higher-ranked team
+        if gap <= 0:
+            continue
+        if gap > best_gap:
+            best_gap, best_matches = gap, [(winner, loser, m)]
+        elif gap == best_gap:
+            best_matches.append((winner, loser, m))
+    if best_gap < 1:
+        return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for winner, loser, m in best_matches:
+        p = owner.get(loser)
+        if not p:
+            continue
+        entry = by_player.setdefault(p, {"teams": set(), "details": []})
+        entry["teams"].add(loser)
+        entry["details"].append(f"{loser} (#{_rank[loser]+1}) lost to {winner} (#{_rank[winner]+1})")
+    if not by_player:
+        return {"status": "open"}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"ranking gap of {best_gap} · " + " · ".join(v["details"])}
+        for p, v in sorted(by_player.items())
+    ]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
 def cinderella(b: dict) -> dict:
     by_player: dict[str, list] = {}
     for p, ts in b["allocation"].items():
@@ -1088,6 +1131,7 @@ AWARDS = [
     {"icon": "🫀", "name": "Penalty Loser", "blurb": "Your team is knocked out on penalties", "fn": penalty_loser, "booby": True},
     {"icon": "🥅", "name": "Penalty Villain", "blurb": "Your team's player misses or has a penalty saved in open play", "fn": penalty_villain, "booby": True},
     {"icon": "🅿️", "name": "Pointless", "blurb": "One of your teams finishes the groups on 0 points", "fn": pointless, "booby": True},
+    {"icon": "👑", "name": "Ranking Spanking", "blurb": "Your highest-ranked team suffers the biggest upset defeat by ranking", "fn": ranking_spanking, "booby": True},
     {"icon": "🟥", "name": "Seeing Red", "blurb": "Own a team that gets a player sent off", "fn": seeing_red, "booby": True},
     {"icon": "🦆", "name": "Sitting Duck", "blurb": "Own the team that concedes the fastest goal", "fn": sitting_duck, "booby": True},
     {"icon": "🧎", "name": "Whipping Boys", "blurb": "Own the team on the wrong end of the Biggest Thrashing", "fn": whipping_boys, "booby": True},
