@@ -493,36 +493,40 @@ def _lead_swaps(m: dict) -> int:
 
 
 def rollercoaster(b: dict) -> dict:
+    """Player whose 3 teams collectively feature in the most lead-change games (total swaps)."""
     from data import _on_pitch
     owner = b["owner"]
-    best, items = 0, []
+    # Per player: total lead swaps and the games that contributed
+    by_player: dict[str, dict] = {}
     for m in b["_matches"]:
         if _on_pitch(m.get("score")) is None:
             continue
         sw = _lead_swaps(m)
-        if sw > best:
-            best, items = sw, [m]
-        elif sw == best and sw > 0:
-            items.append(m)
-    if best < 1:
-        return {"status": "open"}
-    by_player: dict[str, list] = {}
-    for m in items:
+        if sw < 1:
+            continue
         sc = _on_pitch(m.get("score"))
-        match_detail = f"{m['team1']} {sc[0]}–{sc[1]} {m['team2']} (lead changed {best}×)"
+        match_detail = f"{m['team1']} {sc[0]}–{sc[1]} {m['team2']} (lead changed {sw}×)"
+        seen_players: set[str] = set()
         for t in (m["team1"], m["team2"]):
-            if owner.get(t):
-                p = owner[t]
-                by_player.setdefault(p, {"teams": [], "details": []})
-                by_player[p]["teams"].append(t)
-                if match_detail not in by_player[p]["details"]:
-                    by_player[p]["details"].append(match_detail)
+            p = owner.get(t)
+            if not p or p in seen_players:
+                continue
+            seen_players.add(p)
+            entry = by_player.setdefault(p, {"total": 0, "teams": set(), "details": []})
+            entry["total"] += sw
+            entry["teams"].add(t)
+            entry["details"].append(match_detail)
     if not by_player:
         return {"status": "open"}
-    all_teams = [t for v in by_player.values() for t in v["teams"]]
-    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
-                    for p, v in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player),
+    best = max(v["total"] for v in by_player.values())
+    winners = {p: v for p, v in by_player.items() if v["total"] == best}
+    all_teams = [t for v in winners.values() for t in v["teams"]]
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"{v['total']} lead change{'s' if v['total'] != 1 else ''} · " + " · ".join(v["details"])}
+        for p, v in sorted(winners.items())
+    ]
+    return {"status": "won", "holders": sorted(winners),
             "teams": all_teams, "holder_lines": holder_lines}
 
 
@@ -989,42 +993,44 @@ def seeing_red(b: dict) -> dict:
 
 
 AWARDS = [
-    {"icon": "🩸", "name": "First Blood", "blurb": "Owned the team that scored the tournament's first goal", "fn": first_blood},
+    # ── Hall of Fame (A-Z) ──────────────────────────────────────────────────
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
-    {"icon": "🔝", "name": "Top Team", "blurb": "Owns the single highest-scoring team", "fn": top_team},
-    {"icon": "✨", "name": "Treble Dream", "blurb": "All three of your teams reach the knockouts", "fn": treble_dream},
-    {"icon": "🎩", "name": "Hat-trick Hero", "blurb": "A player on one of your teams scores 3+ in a game", "fn": hat_trick_hero},
-    {"icon": "🗡️", "name": "Giant Killer", "blurb": "One of your underdogs beats a top-16 side", "fn": giant_killer},
-    {"icon": "💀", "name": "Giant Slain", "blurb": "One of your top-16 teams loses to a lower-ranked side", "fn": giant_slain, "booby": True},
     {"icon": "👠", "name": "Cinderella", "blurb": "One of your bottom-16 teams reaches the knockouts", "fn": cinderella},
     {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your team wins after trailing at half-time", "fn": comeback_kings},
-    {"icon": "👑", "name": "Golden Owner", "blurb": "You own the tournament's top goalscorer", "fn": golden_owner},
-    {"icon": "⏱️", "name": "Stoppage Time King", "blurb": "Your teams score the most goals in added time", "fn": stoppage_time_king},
-    {"icon": "🎢", "name": "Rollercoaster", "blurb": "Own a team in the game with the most lead changes", "fn": rollercoaster},
-    {"icon": "🎰", "name": "The Full Set", "blurb": "All three of your teams win at least one game", "fn": the_full_set},
     {"icon": "🐎", "name": "Dark Horse", "blurb": "Your bottom-pot team outscores both your stronger teams", "fn": dark_horse},
-    {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
-    {"icon": "🎭", "name": "The Entertainers", "blurb": "Your teams' games rack up the most goals (scored + conceded)", "fn": the_entertainers},
-    {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
+    {"icon": "🩸", "name": "First Blood", "blurb": "Owned the team that scored the tournament's first goal", "fn": first_blood},
+    {"icon": "🗡️", "name": "Giant Killer", "blurb": "One of your underdogs beats a top-16 side", "fn": giant_killer},
+    {"icon": "👑", "name": "Golden Owner", "blurb": "You own the tournament's top goalscorer", "fn": golden_owner},
+    {"icon": "🎩", "name": "Hat-trick Hero", "blurb": "A player on one of your teams scores 3+ in a game", "fn": hat_trick_hero},
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
+    {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
+    {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
+    {"icon": "🎢", "name": "Rollercoaster", "blurb": "Your 3 teams' games have the most lead changes combined", "fn": rollercoaster},
+    {"icon": "⏱️", "name": "Stoppage Time King", "blurb": "Your teams score the most goals in added time", "fn": stoppage_time_king},
     {"icon": "🔥", "name": "Super Sub", "blurb": "A substitute on one of your teams comes on and scores", "fn": super_sub},
     {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
-    {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
-    {"icon": "🕳️", "name": "Leaky Sieve", "blurb": "Your team conceded the most goals", "fn": leaky_sieve, "booby": True},
-    {"icon": "😴", "name": "Bore Draw King", "blurb": "Your teams featured in the most 0-0 draws", "fn": bore_draw_king, "booby": True},
-    {"icon": "🤦", "name": "Own Goal King", "blurb": "Your teams scored the most own goals", "fn": own_goal_king, "booby": True},
-    {"icon": "🪦", "name": "First Out - Knockouts", "blurb": "Own the first team knocked out in the knockouts", "fn": first_to_fall, "booby": True},
-    {"icon": "🫀", "name": "Penalty Loser", "blurb": "Your team is knocked out on penalties", "fn": penalty_loser, "booby": True},
+    {"icon": "🎰", "name": "The Full Set", "blurb": "All three of your teams win at least one game", "fn": the_full_set},
+    {"icon": "🎭", "name": "The Entertainers", "blurb": "Your teams' games rack up the most goals (scored + conceded)", "fn": the_entertainers},
+    {"icon": "🔝", "name": "Top Team", "blurb": "Owns the single highest-scoring team", "fn": top_team},
+    {"icon": "✨", "name": "Treble Dream", "blurb": "All three of your teams reach the knockouts", "fn": treble_dream},
+    # ── Hall of Shame (A-Z) ─────────────────────────────────────────────────
+    {"icon": "🟨", "name": "Bad Boys", "blurb": "Your three teams rack up the most yellow cards", "fn": bad_boys, "booby": True},
     {"icon": "📉", "name": "Biggest Collapse", "blurb": "Your team had the biggest half-time lead and still didn't win", "fn": biggest_collapse, "booby": True},
+    {"icon": "😴", "name": "Bore Draw King", "blurb": "Your teams featured in the most 0-0 draws", "fn": bore_draw_king, "booby": True},
+    {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
     {"icon": "🏜️", "name": "Clean Sheet Drought", "blurb": "Your 3 teams collectively keep the fewest clean sheets", "fn": colander, "booby": True},
     {"icon": "🚪", "name": "First Out - Groups", "blurb": "Own the first team eliminated from the group stage (fewest points, worst record)", "fn": first_out_group, "booby": True},
-    {"icon": "🅿️", "name": "Pointless", "blurb": "One of your teams finishes the groups on 0 points", "fn": pointless, "booby": True},
+    {"icon": "🪦", "name": "First Out - Knockouts", "blurb": "Own the first team knocked out in the knockouts", "fn": first_to_fall, "booby": True},
+    {"icon": "💀", "name": "Giant Slain", "blurb": "One of your top-16 teams loses to a lower-ranked side", "fn": giant_slain, "booby": True},
     {"icon": "🤐", "name": "Goal Shy", "blurb": "One of your teams fails to score in the group stage", "fn": goal_shy, "booby": True},
+    {"icon": "🕳️", "name": "Leaky Sieve", "blurb": "Your team conceded the most goals", "fn": leaky_sieve, "booby": True},
+    {"icon": "🤦", "name": "Own Goal King", "blurb": "Your teams scored the most own goals", "fn": own_goal_king, "booby": True},
+    {"icon": "🫀", "name": "Penalty Loser", "blurb": "Your team is knocked out on penalties", "fn": penalty_loser, "booby": True},
+    {"icon": "🥅", "name": "Penalty Villain", "blurb": "Your team's player misses or has a penalty saved in open play", "fn": penalty_villain, "booby": True},
+    {"icon": "🅿️", "name": "Pointless", "blurb": "One of your teams finishes the groups on 0 points", "fn": pointless, "booby": True},
+    {"icon": "🟥", "name": "Seeing Red", "blurb": "Own a team that gets a player sent off", "fn": seeing_red, "booby": True},
     {"icon": "🦆", "name": "Sitting Duck", "blurb": "Own the team that concedes the fastest goal", "fn": sitting_duck, "booby": True},
     {"icon": "🧎", "name": "Whipping Boys", "blurb": "Own the team on the wrong end of the Biggest Thrashing", "fn": whipping_boys, "booby": True},
-    {"icon": "🟨", "name": "Bad Boys", "blurb": "Your three teams rack up the most yellow cards", "fn": bad_boys, "booby": True},
-    {"icon": "🟥", "name": "Seeing Red", "blurb": "Own a team that gets a player sent off", "fn": seeing_red, "booby": True},
-    {"icon": "🥅", "name": "Penalty Villain", "blurb": "Your team's player misses or has a penalty saved in open play", "fn": penalty_villain, "booby": True},
 ]
 
 
