@@ -409,6 +409,49 @@ def ranking_spanking(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
+def ranking_king(b: dict) -> dict:
+    """Your lowest-ranked team produces the biggest upset win by ranking gap."""
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    _rank = {t: i for i, t in enumerate(_RANKING)}
+    best_gap, best_matches = -1, []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        winner, loser = _winner_loser(m, sc)
+        if not winner or not loser:
+            continue
+        wr, lr = _rank.get(winner, -1), _rank.get(loser, -1)
+        if wr < 0 or lr < 0:
+            continue
+        gap = wr - lr
+        if gap <= 0:
+            continue
+        if gap > best_gap:
+            best_gap, best_matches = gap, [(winner, loser, m)]
+        elif gap == best_gap:
+            best_matches.append((winner, loser, m))
+    if best_gap < 1:
+        return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for winner, loser, m in best_matches:
+        p = owner.get(winner)
+        if not p:
+            continue
+        entry = by_player.setdefault(p, {"teams": set(), "details": []})
+        entry["teams"].add(winner)
+        entry["details"].append(f"{winner} (#{_rank[winner]+1}) beat {loser} (#{_rank[loser]+1})")
+    if not by_player:
+        return {"status": "open"}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"ranking gap of {best_gap} · " + " · ".join(v["details"])}
+        for p, v in sorted(by_player.items())
+    ]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
 def cinderella(b: dict) -> dict:
     by_player: dict[str, list] = {}
     for p, ts in b["allocation"].items():
@@ -1107,6 +1150,7 @@ AWARDS = [
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
     {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
     {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
+    {"icon": "🤴", "name": "Ranking King", "blurb": "Your team pulls off the biggest upset win by FIFA ranking gap", "fn": ranking_king},
     {"icon": "🎢", "name": "Rollercoaster", "blurb": "Your 3 teams' games have the most lead changes combined", "fn": rollercoaster},
     {"icon": "⏱️", "name": "Stoppage Time King", "blurb": "Your teams score the most goals in added time", "fn": stoppage_time_king},
     {"icon": "🔥", "name": "Super Sub", "blurb": "Your 3 teams' substitutes score the most goals combined", "fn": super_sub},
