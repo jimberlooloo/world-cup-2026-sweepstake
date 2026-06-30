@@ -351,6 +351,7 @@ def _share_text(b: dict) -> str:
 # Newest first. Keep generic — no real names, no personal content.
 UPDATES = [
     ("30 Jun", "💀 New shame trophy: Giant Slain — your top-16 team knocked out by a lower side"),
+    ("30 Jun", "🔴 Eliminated teams greyed out with strikethrough on player cards"),
     ("22 Jun", "🚪 New shame trophy: First Out — first team eliminated from the groups"),
     ("22 Jun", "🍫 Wooden Spoon renamed to Chocolate Bar, added to prize list"),
     ("16 Jun", "📅 Next match shown on each player's card"),
@@ -493,6 +494,9 @@ PLAYERS_CSS = """
 .pc-row .st { font-size:13px; }
 .pc-row .g { color:#ffd84d; font-weight:700; font-size:14px;
              min-width:34px; text-align:right; white-space:nowrap; }
+.pc-row.out { opacity:0.38; }
+.pc-row.out .tm { text-decoration:line-through; }
+.pc-row.out .g { color:#888; }
 .pl-legend { color:#8a8a96; font-size:11px; margin:2px 2px 0; }
 .pc-next { padding:6px 14px 8px; border-top:1px solid #ffffff10;
            color:#8a8a96; font-size:12px; }
@@ -539,8 +543,10 @@ def _player_card(rank: int, player: str, teams: list[str], total: int,
     goals, status, flags = b["goals"], b["status"], b["flags"]
     rows = []
     for t in sorted(teams, key=lambda x: goals.get(x, 0), reverse=True):
+        eliminated = (status.get(t) or {}).get("alive") is False
+        row_cls = "pc-row out" if eliminated else "pc-row"
         rows.append(
-            f'<div class="pc-row"><span class="fl">{flags.get(t,"")}</span>'
+            f'<div class="{row_cls}"><span class="fl">{flags.get(t,"")}</span>'
             f'<span class="tm">{html.escape(str(t))}</span>'
             f'<span class="st">{_status_dot(status.get(t))}</span>'
             f'<span class="g">{goals.get(t,0)} ⚽</span></div>'
