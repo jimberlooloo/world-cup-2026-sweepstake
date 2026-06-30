@@ -289,6 +289,14 @@ def team_status(
                 status[loser].update(alive=False, label="4th place")
         elif loser in valid_teams:
             status[loser].update(alive=False, label=f"out · {rnd}")
+
+    # Once the KO bracket is seeded, any team still at alive=None never qualified.
+    if any(r >= 0 for _, r in ko):
+        for team, s in status.items():
+            if s.get("alive") is None:
+                s["alive"] = False
+                s["label"] = s["label"] + " · eliminated"
+
     return status
 
 
