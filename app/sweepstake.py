@@ -200,7 +200,14 @@ def render_money(b: dict) -> None:
         else:
             line = f'<div class="mn-tbd">{html.escape(rule)} · {html.escape(tbd)}</div>'
         fav = favourites.get(name)
-        fav_html = (f' <span class="mn-fav">📊 {html.escape(fav)}</span>' if fav else "")
+        if fav:
+            # fav is "Team (odds)" — extract team to find owner
+            fav_team = fav.split(" (")[0]
+            fav_owner = owner.get(fav_team, "")
+            owner_str = f" · owned by {fav_owner}" if fav_owner else ""
+            fav_html = (f'<span class="mn-fav">🎰 Bookies fav: {html.escape(fav)}{html.escape(owner_str)}</span>')
+        else:
+            fav_html = ""
         amt_str = f"£{amt}" if amt else "🍫"
         rows.append(f'<div class="mn-row"><div class="mn-top"><span class="mn-prize">'
                     f'{name}</span><span class="mn-amt">{amt_str}</span></div>{line}{fav_html}</div>')
