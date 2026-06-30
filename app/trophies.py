@@ -1002,7 +1002,30 @@ def bad_boys(b: dict) -> dict:
 
 
 def seeing_red(b: dict) -> dict:
-    """Player whose 3 teams collect the most red cards."""
+    """Own a team that gets a player sent off."""
+    owner = b["owner"]
+    by_player: dict[str, dict] = {}
+    for m in b["_matches"]:
+        for cards, team in ((m.get("cards1"), m["team1"]), (m.get("cards2"), m["team2"])):
+            p = owner.get(team)
+            if not p:
+                continue
+            for c in (cards or []):
+                if c.get("type") == "red":
+                    entry = by_player.setdefault(p, {"teams": set(), "details": []})
+                    entry["teams"].add(team)
+                    entry["details"].append(f"{c.get('name', '?')} ({team})")
+    if not by_player:
+        return {"status": "open"}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+        for p, v in sorted(by_player.items())
+    ]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
+def badder_boys(b: dict) -> dict:
+    """Player whose 3 teams collect the most red cards combined."""
     owner = b["owner"]
     by_player: dict[str, dict] = {}
     for m in b["_matches"]:
@@ -1051,7 +1074,7 @@ AWARDS = [
     {"icon": "✨", "name": "Treble Dream", "blurb": "All three of your teams reach the knockouts", "fn": treble_dream},
     # ── Hall of Shame (A-Z) ─────────────────────────────────────────────────
     {"icon": "🟨", "name": "Bad Boys", "blurb": "Your three teams rack up the most yellow cards", "fn": bad_boys, "booby": True},
-    {"icon": "🟥", "name": "Badder Boys", "blurb": "Your three teams rack up the most red cards", "fn": seeing_red, "booby": True},
+    {"icon": "🟥", "name": "Badder Boys", "blurb": "Your three teams rack up the most red cards", "fn": badder_boys, "booby": True},
     {"icon": "📉", "name": "Biggest Collapse", "blurb": "Your team had the biggest half-time lead and still didn't win", "fn": biggest_collapse, "booby": True},
     {"icon": "😴", "name": "Bore Draw King", "blurb": "Your teams featured in the most 0-0 draws", "fn": bore_draw_king, "booby": True},
     {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
@@ -1065,6 +1088,7 @@ AWARDS = [
     {"icon": "🫀", "name": "Penalty Loser", "blurb": "Your team is knocked out on penalties", "fn": penalty_loser, "booby": True},
     {"icon": "🥅", "name": "Penalty Villain", "blurb": "Your team's player misses or has a penalty saved in open play", "fn": penalty_villain, "booby": True},
     {"icon": "🅿️", "name": "Pointless", "blurb": "One of your teams finishes the groups on 0 points", "fn": pointless, "booby": True},
+    {"icon": "🟥", "name": "Seeing Red", "blurb": "Own a team that gets a player sent off", "fn": seeing_red, "booby": True},
     {"icon": "🦆", "name": "Sitting Duck", "blurb": "Own the team that concedes the fastest goal", "fn": sitting_duck, "booby": True},
     {"icon": "🧎", "name": "Whipping Boys", "blurb": "Own the team on the wrong end of the Biggest Thrashing", "fn": whipping_boys, "booby": True},
 ]
