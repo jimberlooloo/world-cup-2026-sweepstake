@@ -597,6 +597,103 @@ def the_entertainers(b: dict) -> dict:
             "detail": f"{top} goals in their games (scored + conceded)"}
 
 
+def penalty_loser(b: dict) -> dict:
+    """Own a team knocked out on penalties in the knockouts."""
+    from data import _on_pitch
+    owner = b["owner"]
+    by_player: dict[str, list] = {}
+    for m in b["_matches"]:
+        if m.get("group"):
+            continue
+        sc = _on_pitch(m.get("score"))
+        if sc is None or sc[0] != sc[1]:
+            continue  # only matches level after ET
+        p = (m.get("score") or {}).get("p")
+        if not p or p[0] == p[1]:
+            continue
+        loser = m["team2"] if p[0] > p[1] else m["team1"]
+        if owner.get(loser):
+            pl = owner[loser]
+            by_player.setdefault(pl, {"teams": [], "details": []})
+            by_player[pl]["teams"].append(loser)
+            by_player[pl]["details"].append(f"{loser} lost on penalties")
+    if not by_player:
+        return {"status": "open"}
+    holder_lines = [{"holder": pl, "teams": v["teams"], "detail": " · ".join(v["details"])}
+                    for pl, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
+def biggest_collapse(b: dict) -> dict:
+    """Your team had the biggest half-time lead but failed to win."""
+    from data import _on_pitch
+    owner = b["owner"]
+    best_swing, best = 0, []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        ht = (m.get("score") or {}).get("ht")
+        if sc is None or not ht:
+            continue
+        for team, ht_for, ht_ag, ft_for, ft_ag in (
+            (m["team1"], ht[0], ht[1], sc[0], sc[1]),
+            (m["team2"], ht[1], ht[0], sc[1], sc[0]),
+        ):
+            lead = ht_for - ht_ag
+            if lead <= 0:
+                continue  # wasn't winning at HT
+            if ft_for >= ft_ag:
+                continue  # held on — no collapse
+            swing = lead + (ft_ag - ft_for)  # HT lead + points lost
+            if owner.get(team):
+                entry = (swing, team, lead, ft_for, ft_ag, m["team1"], m["team2"])
+                if swing > best_swing:
+                    best_swing, best = swing, [entry]
+                elif swing == best_swing:
+                    best.append(entry)
+    if not best:
+        return {"status": "open"}
+    by_player: dict[str, list] = {}
+    details: dict[str, list] = {}
+    for swing, team, lead, ff, fa, t1, t2 in best:
+        opp = t2 if team == t1 else t1
+        p = owner[team]
+        by_player.setdefault(p, []).append(team)
+        details.setdefault(p, []).append(f"{team} led {lead}-0 at HT, lost to {opp}")
+    holder_lines = [{"holder": p, "teams": ts, "detail": " · ".join(details[p])}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
+def colander(b: dict) -> dict:
+    """Player whose 3 teams have collectively kept the fewest clean sheets."""
+    from data import _on_pitch
+    owner = b["owner"]
+    # Count clean sheets per team
+    clean: dict[str, int] = {}
+    played: dict[str, int] = {}
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        for team, conceded in ((m["team1"], sc[1]), (m["team2"], sc[0])):
+            played[team] = played.get(team, 0) + 1
+            if conceded == 0:
+                clean[team] = clean.get(team, 0) + 1
+    # Only consider players whose teams have collectively played at least 3 games
+    by_player: dict[str, int] = {}
+    for p, ts in b["allocation"].items():
+        total_played = sum(played.get(t, 0) for t in ts)
+        if total_played < 3:
+            continue
+        by_player[p] = sum(clean.get(t, 0) for t in ts)
+    if not by_player:
+        return {"status": "open"}
+    fewest = min(by_player.values())
+    holders = sorted(p for p, c in by_player.items() if c == fewest)
+    return {"status": "won", "holders": holders,
+            "detail": f"{fewest} clean sheet{'s' if fewest != 1 else ''} across all 3 teams"}
+
+
 def first_out_group(b: dict) -> dict:
     """First team(s) eliminated from the group stage — fewest points among non-qualifiers,
     ties broken by goal difference then goals scored. Settled once the group stage is done."""
@@ -912,13 +1009,14 @@ AWARDS = [
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
     {"icon": "🔥", "name": "Super Sub", "blurb": "A substitute on one of your teams comes on and scores", "fn": super_sub},
     {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
-    {"icon": "🪣", "name": "Total Wipeout", "blurb": "All three of your teams out in the group stage", "fn": total_wipeout, "booby": True},
     {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
     {"icon": "🕳️", "name": "Leaky Sieve", "blurb": "Your team conceded the most goals", "fn": leaky_sieve, "booby": True},
     {"icon": "😴", "name": "Bore Draw King", "blurb": "Your teams featured in the most 0-0 draws", "fn": bore_draw_king, "booby": True},
     {"icon": "🤦", "name": "Own Goal King", "blurb": "Your teams scored the most own goals", "fn": own_goal_king, "booby": True},
-    {"icon": "🐴", "name": "One-Trick Pony", "blurb": "All your goals come from a single team (once all 3 have played)", "fn": one_trick_pony, "booby": True},
     {"icon": "🪦", "name": "First to Fall", "blurb": "Own the first team knocked out in the knockouts", "fn": first_to_fall, "booby": True},
+    {"icon": "🫀", "name": "Penalty Loser", "blurb": "Your team is knocked out on penalties", "fn": penalty_loser, "booby": True},
+    {"icon": "📉", "name": "Biggest Collapse", "blurb": "Your team had the biggest half-time lead and still didn't win", "fn": biggest_collapse, "booby": True},
+    {"icon": "🧺", "name": "Colander", "blurb": "Your 3 teams collectively keep the fewest clean sheets", "fn": colander, "booby": True},
     {"icon": "🚪", "name": "First Out", "blurb": "Own the first team eliminated from the group stage (fewest points, worst record)", "fn": first_out_group, "booby": True},
     {"icon": "🅿️", "name": "Pointless", "blurb": "One of your teams finishes the groups on 0 points", "fn": pointless, "booby": True},
     {"icon": "🤐", "name": "Goal Shy", "blurb": "One of your teams fails to score in the group stage", "fn": goal_shy, "booby": True},

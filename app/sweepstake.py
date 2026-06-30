@@ -348,6 +348,7 @@ def _share_text(b: dict) -> str:
 
 # Newest first. Keep generic — no real names, no personal content.
 UPDATES = [
+    ("30 Jun", "🫀 New: Penalty Loser · 📉 Biggest Collapse · 🧺 Colander"),
     ("30 Jun", "🍫 Chocolate Bar: now goes to the first player with all 3 teams out"),
     ("30 Jun", "💀 New shame trophy: Giant Slain — your top-16 team knocked out by a lower side"),
     ("30 Jun", "🔴 Eliminated teams greyed out with strikethrough on player cards"),
