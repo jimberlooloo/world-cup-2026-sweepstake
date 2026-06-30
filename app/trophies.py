@@ -291,9 +291,11 @@ def giant_killer(b: dict) -> dict:
     by_player: dict[str, list] = {}
     for m in b["_matches"]:
         sc = _on_pitch(m.get("score"))
-        if sc is None or sc[0] == sc[1]:
+        if sc is None:
             continue
         winner, loser = _winner_loser(m, sc)
+        if not winner:
+            continue
         if loser in POT1 and winner not in POT1 and owner.get(winner):
             p = owner[winner]
             by_player.setdefault(p, {"teams": [], "details": []})
@@ -313,9 +315,11 @@ def giant_slain(b: dict) -> dict:
     by_player: dict[str, list] = {}
     for m in b["_matches"]:
         sc = _on_pitch(m.get("score"))
-        if sc is None or sc[0] == sc[1]:
+        if sc is None:
             continue
         winner, loser = _winner_loser(m, sc)
+        if not winner:
+            continue
         if loser in POT1 and winner not in POT1 and owner.get(loser):
             p = owner[loser]
             by_player.setdefault(p, {"teams": [], "details": []})
@@ -501,7 +505,7 @@ def the_full_set(b: dict) -> dict:
     won_a_game = set()
     for m in b["_matches"]:
         sc = _on_pitch(m.get("score"))
-        if sc is None or sc[0] == sc[1]:
+        if sc is None:
             continue
         w, _ = _winner_loser(m, sc)
         if w:
@@ -603,7 +607,7 @@ def first_to_fall(b: dict) -> dict:
         if m.get("group"):  # knockouts only
             continue
         sc = _on_pitch(m.get("score"))
-        if sc is None or sc[0] == sc[1]:
+        if sc is None:
             continue
         _, loser = _winner_loser(m, sc)
         if not loser or not owner.get(loser):
