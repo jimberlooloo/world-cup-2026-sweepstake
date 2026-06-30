@@ -76,10 +76,21 @@ def _overlay_espn(matches: list[dict]) -> None:
         m["score"] = score
         # Prefer openfootball goal events (more accurate); fall back to ESPN only
         # when openfootball has no goal-scorer data yet (empty goals on a played match).
+        # Always merge ESPN's `sub` and `assist` fields — openfootball doesn't track these.
         of_has_goals = m.get("goals1") or m.get("goals2")
         if not of_has_goals:
             m["goals1"] = ov["goals"].get(t1, [])
             m["goals2"] = ov["goals"].get(t2, [])
+        else:
+            for of_goals, team in ((m.get("goals1"), t1), (m.get("goals2"), t2)):
+                espn_by_name = {g["name"]: g for g in ov["goals"].get(team, []) if g.get("name")}
+                for g in (of_goals or []):
+                    espn_g = espn_by_name.get(g.get("name", ""))
+                    if espn_g:
+                        if espn_g.get("sub"):
+                            g["sub"] = True
+                        if espn_g.get("assist") and not g.get("assist"):
+                            g["assist"] = espn_g["assist"]
         m["cards1"] = ov.get("cards", {}).get(t1, [])
         m["cards2"] = ov.get("cards", {}).get(t2, [])
         m["pen_misses1"] = ov.get("pen_misses", {}).get(t1, [])
