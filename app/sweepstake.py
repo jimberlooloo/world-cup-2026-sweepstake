@@ -143,16 +143,14 @@ MONEY_CSS = """
 
 
 def _choc_holders(b: dict) -> list[str]:
-    """Fewest-goals player(s) — always show current leader, not just post-group-stage."""
+    """First player(s) to have all 3 teams eliminated."""
     try:
-        totals = [(p, sum(b["goals"].get(t, 0) for t in ts))
-                  for p, ts in b["allocation"].items()]
-        if not totals:
-            return []
-        low = min(v for _, v in totals)
-        return sorted(p for p, v in totals if v == low)
+        result = trophies.first_all_out(b)
+        if (result or {}).get("status") == "won":
+            return result.get("holders", [])
     except Exception:
-        return []
+        pass
+    return []
 
 
 def render_money(b: dict) -> None:
@@ -180,7 +178,7 @@ def render_money(b: dict) -> None:
         ("👟 Golden Boot", 6, "3 teams' most combined goals", "no goals yet", gb),
         ("🌟 Hall of Fame", 6, "most fame trophies", "up for grabs", hall_leaders(fame_tally)),
         ("🙈 Hall of Shame", 3, "most shame trophies (£3 back)", "up for grabs", hall_leaders(shame_tally)),
-        ("🍫 Chocolate Bar", None, "fewest goals so far (settled after group stage)", "no goals yet", _choc_holders(b)),
+        ("🍫 Chocolate Bar", None, "first to have all 3 teams knocked out", "still teams alive", _choc_holders(b)),
     ]
 
     money: dict[str, float] = {}
@@ -350,6 +348,7 @@ def _share_text(b: dict) -> str:
 
 # Newest first. Keep generic — no real names, no personal content.
 UPDATES = [
+    ("30 Jun", "🍫 Chocolate Bar: now goes to the first player with all 3 teams out"),
     ("30 Jun", "💀 New shame trophy: Giant Slain — your top-16 team knocked out by a lower side"),
     ("30 Jun", "🔴 Eliminated teams greyed out with strikethrough on player cards"),
     ("22 Jun", "🚪 New shame trophy: First Out — first team eliminated from the groups"),
