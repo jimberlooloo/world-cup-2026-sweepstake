@@ -1016,7 +1016,7 @@ AWARDS = [
     {"icon": "🪦", "name": "First to Fall", "blurb": "Own the first team knocked out in the knockouts", "fn": first_to_fall, "booby": True},
     {"icon": "🫀", "name": "Penalty Loser", "blurb": "Your team is knocked out on penalties", "fn": penalty_loser, "booby": True},
     {"icon": "📉", "name": "Biggest Collapse", "blurb": "Your team had the biggest half-time lead and still didn't win", "fn": biggest_collapse, "booby": True},
-    {"icon": "🧺", "name": "Colander", "blurb": "Your 3 teams collectively keep the fewest clean sheets", "fn": colander, "booby": True},
+    {"icon": "🏜️", "name": "Clean Sheet Drought", "blurb": "Your 3 teams collectively keep the fewest clean sheets", "fn": colander, "booby": True},
     {"icon": "🚪", "name": "First Out", "blurb": "Own the first team eliminated from the group stage (fewest points, worst record)", "fn": first_out_group, "booby": True},
     {"icon": "🅿️", "name": "Pointless", "blurb": "One of your teams finishes the groups on 0 points", "fn": pointless, "booby": True},
     {"icon": "🤐", "name": "Goal Shy", "blurb": "One of your teams fails to score in the group stage", "fn": goal_shy, "booby": True},
