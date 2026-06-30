@@ -1150,7 +1150,7 @@ AWARDS = [
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
     {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
     {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
-    {"icon": "🗡️", "name": "Ranking Slayer", "blurb": "Your team pulls off the biggest upset win by FIFA ranking gap", "fn": ranking_king},
+    {"icon": "🐕", "name": "Underdog", "blurb": "Your team pulls off the biggest upset win by FIFA ranking gap", "fn": ranking_king},
     {"icon": "🎢", "name": "Rollercoaster", "blurb": "Your 3 teams' games have the most lead changes combined", "fn": rollercoaster},
     {"icon": "⏱️", "name": "Stoppage Time King", "blurb": "Your teams score the most goals in added time", "fn": stoppage_time_king},
     {"icon": "🔥", "name": "Super Sub", "blurb": "Your 3 teams' substitutes score the most goals combined", "fn": super_sub},
