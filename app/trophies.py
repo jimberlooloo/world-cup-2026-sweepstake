@@ -860,8 +860,9 @@ def playmaker(b: dict) -> dict:
 
 
 def super_sub(b: dict) -> dict:
+    """Player whose 3 teams have the most substitute goals combined."""
     owner = b["owner"]
-    by_player: dict[str, list] = {}
+    by_player: dict[str, dict] = {}
     for m in b["_matches"]:
         for goals, team in ((m.get("goals1"), m["team1"]), (m.get("goals2"), m["team2"])):
             p = owner.get(team)
@@ -869,14 +870,20 @@ def super_sub(b: dict) -> dict:
                 continue
             for g in (goals or []):
                 if g.get("sub") and not g.get("owngoal"):
-                    by_player.setdefault(p, {"teams": [], "details": []})
-                    by_player[p]["teams"].append(team)
-                    by_player[p]["details"].append(f"{g.get('name', '?')} ({team})")
+                    entry = by_player.setdefault(p, {"count": 0, "teams": set(), "details": []})
+                    entry["count"] += 1
+                    entry["teams"].add(team)
+                    entry["details"].append(f"{g.get('name', '?')} ({team})")
     if not by_player:
         return {"status": "open"}
-    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
-                    for p, v in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+    best = max(v["count"] for v in by_player.values())
+    winners = {p: v for p, v in by_player.items() if v["count"] == best}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"{v['count']} sub goal{'s' if v['count'] != 1 else ''} · " + " · ".join(v["details"])}
+        for p, v in sorted(winners.items())
+    ]
+    return {"status": "won", "holders": sorted(winners), "holder_lines": holder_lines}
 
 
 def ten_men(b: dict) -> dict:
@@ -1007,7 +1014,7 @@ AWARDS = [
     {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
     {"icon": "🎢", "name": "Rollercoaster", "blurb": "Your 3 teams' games have the most lead changes combined", "fn": rollercoaster},
     {"icon": "⏱️", "name": "Stoppage Time King", "blurb": "Your teams score the most goals in added time", "fn": stoppage_time_king},
-    {"icon": "🔥", "name": "Super Sub", "blurb": "A substitute on one of your teams comes on and scores", "fn": super_sub},
+    {"icon": "🔥", "name": "Super Sub", "blurb": "Your 3 teams' substitutes score the most goals combined", "fn": super_sub},
     {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
     {"icon": "🎰", "name": "The Full Set", "blurb": "All three of your teams win at least one game", "fn": the_full_set},
     {"icon": "🎭", "name": "The Entertainers", "blurb": "Your teams' games rack up the most goals (scored + conceded)", "fn": the_entertainers},
