@@ -466,7 +466,7 @@ def _offset(g: dict) -> int:
 def stoppage_time_king(b: dict) -> dict:
     from data import _on_pitch
     owner = b["owner"]
-    by_player: dict[str, int] = {}
+    by_player: dict[str, dict] = {}
     for m in b["_matches"]:
         if _on_pitch(m.get("score")) is None:
             continue
@@ -476,12 +476,20 @@ def stoppage_time_king(b: dict) -> dict:
                 continue
             for g in (gl or []):
                 if not g.get("owngoal") and _offset(g) > 0:
-                    by_player[p] = by_player.get(p, 0) + 1
-    top = max(by_player.values(), default=0)
+                    entry = by_player.setdefault(p, {"count": 0, "teams": set(), "details": []})
+                    entry["count"] += 1
+                    entry["teams"].add(team)
+                    entry["details"].append(f"{g.get('name', '?')} {g.get('minute', '')} ({team})")
+    top = max((v["count"] for v in by_player.values()), default=0)
     if top == 0:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(p for p, c in by_player.items() if c == top),
-            "detail": f"{top} stoppage-time goal{'s' if top != 1 else ''}"}
+    winners = {p: v for p, v in by_player.items() if v["count"] == top}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"{top} stoppage-time goal{'s' if top != 1 else ''} · " + " · ".join(v["details"])}
+        for p, v in sorted(winners.items())
+    ]
+    return {"status": "won", "holders": sorted(winners), "holder_lines": holder_lines}
 
 
 def _lead_swaps(m: dict) -> int:
