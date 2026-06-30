@@ -493,36 +493,40 @@ def _lead_swaps(m: dict) -> int:
 
 
 def rollercoaster(b: dict) -> dict:
+    """Player whose 3 teams collectively feature in the most lead-change games (total swaps)."""
     from data import _on_pitch
     owner = b["owner"]
-    best, items = 0, []
+    # Per player: total lead swaps and the games that contributed
+    by_player: dict[str, dict] = {}
     for m in b["_matches"]:
         if _on_pitch(m.get("score")) is None:
             continue
         sw = _lead_swaps(m)
-        if sw > best:
-            best, items = sw, [m]
-        elif sw == best and sw > 0:
-            items.append(m)
-    if best < 1:
-        return {"status": "open"}
-    by_player: dict[str, list] = {}
-    for m in items:
+        if sw < 1:
+            continue
         sc = _on_pitch(m.get("score"))
-        match_detail = f"{m['team1']} {sc[0]}–{sc[1]} {m['team2']} (lead changed {best}×)"
+        match_detail = f"{m['team1']} {sc[0]}–{sc[1]} {m['team2']} (lead changed {sw}×)"
+        seen_players: set[str] = set()
         for t in (m["team1"], m["team2"]):
-            if owner.get(t):
-                p = owner[t]
-                by_player.setdefault(p, {"teams": [], "details": []})
-                by_player[p]["teams"].append(t)
-                if match_detail not in by_player[p]["details"]:
-                    by_player[p]["details"].append(match_detail)
+            p = owner.get(t)
+            if not p or p in seen_players:
+                continue
+            seen_players.add(p)
+            entry = by_player.setdefault(p, {"total": 0, "teams": set(), "details": []})
+            entry["total"] += sw
+            entry["teams"].add(t)
+            entry["details"].append(match_detail)
     if not by_player:
         return {"status": "open"}
-    all_teams = [t for v in by_player.values() for t in v["teams"]]
-    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
-                    for p, v in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player),
+    best = max(v["total"] for v in by_player.values())
+    winners = {p: v for p, v in by_player.items() if v["total"] == best}
+    all_teams = [t for v in winners.values() for t in v["teams"]]
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"{v['total']} lead change{'s' if v['total'] != 1 else ''} · " + " · ".join(v["details"])}
+        for p, v in sorted(winners.items())
+    ]
+    return {"status": "won", "holders": sorted(winners),
             "teams": all_teams, "holder_lines": holder_lines}
 
 
@@ -1001,7 +1005,7 @@ AWARDS = [
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
     {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
     {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
-    {"icon": "🎢", "name": "Rollercoaster", "blurb": "Own a team in the game with the most lead changes", "fn": rollercoaster},
+    {"icon": "🎢", "name": "Rollercoaster", "blurb": "Your 3 teams' games have the most lead changes combined", "fn": rollercoaster},
     {"icon": "⏱️", "name": "Stoppage Time King", "blurb": "Your teams score the most goals in added time", "fn": stoppage_time_king},
     {"icon": "🔥", "name": "Super Sub", "blurb": "A substitute on one of your teams comes on and scores", "fn": super_sub},
     {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
