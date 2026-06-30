@@ -130,6 +130,7 @@ MONEY_CSS = """
 .mn-amt { color:#ffd84d; font-weight:800; font-size:14px; white-space:nowrap; }
 .mn-who { color:#9fdcbb; font-size:12px; margin-top:1px; }
 .mn-tbd { color:#5fae86; font-size:12px; font-style:italic; margin-top:1px; }
+.mn-fav { color:#a0c8ff; font-size:11px; display:block; margin-top:2px; }
 .lb { border:1px solid #2a2a33; border-radius:10px; background:#15151c;
       margin-bottom:10px; overflow:hidden; }
 .lb-h { background:#1c1c26; color:#9090a0; font-size:10px; font-weight:700;
@@ -181,6 +182,12 @@ def render_money(b: dict) -> None:
         ("🍫 Chocolate Bar", None, "first to have all 3 teams knocked out", "still teams alive", _choc_holders(b)),
     ]
 
+    try:
+        import odds as _odds_mod
+        favourites = _odds_mod.fetch_favourites() or {}
+    except Exception:
+        favourites = {}
+
     money: dict[str, float] = {}
     rows = []
     for name, amt, rule, tbd, holders in prizes:
@@ -192,9 +199,11 @@ def render_money(b: dict) -> None:
                     f'{", ".join(html.escape(h) for h in holders)}</div>')
         else:
             line = f'<div class="mn-tbd">{html.escape(rule)} · {html.escape(tbd)}</div>'
+        fav = favourites.get(name)
+        fav_html = (f' <span class="mn-fav">📊 {html.escape(fav)}</span>' if fav else "")
         amt_str = f"£{amt}" if amt else "🍫"
         rows.append(f'<div class="mn-row"><div class="mn-top"><span class="mn-prize">'
-                    f'{name}</span><span class="mn-amt">{amt_str}</span></div>{line}</div>')
+                    f'{name}</span><span class="mn-amt">{amt_str}</span></div>{line}{fav_html}</div>')
 
     def fmt(x: float) -> str:
         return f"£{x:.0f}" if x == int(x) else f"£{x:.2f}"
