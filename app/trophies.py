@@ -217,15 +217,41 @@ def own_goal_king(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
-def wooden_spoon(b: dict) -> dict:
-    """Fewest combined goals. Settled once the group stage is done, so we don't crown it
-    while the table is still all zeros. Ties share it."""
-    totals = [(p, sum(b["goals"].get(t, 0) for t in ts)) for p, ts in b["allocation"].items()]
-    if not totals or not _group_done(b):
+def first_all_out(b: dict) -> dict:
+    """First player to have all 3 of their teams eliminated from the tournament.
+    Determined by when each player's last surviving team played their final match."""
+    from data import _on_pitch, _uk_kickoff
+    from datetime import datetime
+
+    status, owner = b["status"], b["owner"]
+
+    # Date of each team's last played match = their elimination date
+    team_exit: dict[str, datetime] = {}
+    for m in b["_matches"]:
+        if _on_pitch(m.get("score")) is None:
+            continue
+        ko = _uk_kickoff(m.get("date", ""), m.get("time", ""))
+        if ko is None:
+            continue
+        for t in (m["team1"], m["team2"]):
+            if t not in team_exit or ko > team_exit[t]:
+                team_exit[t] = ko
+
+    # For each player, find when their last team was eliminated
+    all_out: dict[str, datetime] = {}
+    for p, ts in b["allocation"].items():
+        if not all((status.get(t) or {}).get("alive") is False for t in ts):
+            continue  # still have a team alive
+        exits = [team_exit[t] for t in ts if t in team_exit]
+        if len(exits) == len(ts):
+            all_out[p] = max(exits)  # when their final team went out
+
+    if not all_out:
         return {"status": "open"}
-    low = min(t for _, t in totals)
-    return {"status": "won", "holders": sorted(p for p, t in totals if t == low),
-            "detail": f"fewest combined goals ({low})"}
+    earliest = min(all_out.values())
+    holders = sorted(p for p, d in all_out.items() if d == earliest)
+    return {"status": "won", "holders": holders,
+            "detail": "first to have all 3 teams knocked out"}
 
 
 # Team strength tiers (FIFA ranking, 1 Apr 2026 anchored) — the same pots the draw used,
@@ -886,7 +912,7 @@ AWARDS = [
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
     {"icon": "🔥", "name": "Super Sub", "blurb": "A substitute on one of your teams comes on and scores", "fn": super_sub},
     {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
-    {"icon": "🍫", "name": "Chocolate Bar", "blurb": "Fewest combined goals (settled after the group stage)", "fn": wooden_spoon, "booby": True},
+    {"icon": "🍫", "name": "Chocolate Bar", "blurb": "First player to have all 3 teams knocked out of the tournament", "fn": first_all_out, "booby": True},
     {"icon": "🪣", "name": "Total Wipeout", "blurb": "All three of your teams out in the group stage", "fn": total_wipeout, "booby": True},
     {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
     {"icon": "🕳️", "name": "Leaky Sieve", "blurb": "Your team conceded the most goals", "fn": leaky_sieve, "booby": True},
