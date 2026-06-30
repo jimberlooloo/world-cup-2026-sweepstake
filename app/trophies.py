@@ -448,10 +448,19 @@ def one_trick_pony(b: dict) -> dict:
 
 
 def _offset(g: dict) -> int:
-    try:
-        return int(g.get("offset") or 0)
-    except (ValueError, TypeError):
-        return 0
+    # Explicit offset field (openfootball) or parse from "90+4" minute string (ESPN)
+    if g.get("offset"):
+        try:
+            return int(g["offset"])
+        except (ValueError, TypeError):
+            pass
+    minute = str(g.get("minute", ""))
+    if "+" in minute:
+        try:
+            return int(minute.split("+", 1)[1])
+        except (ValueError, IndexError):
+            pass
+    return 0
 
 
 def stoppage_time_king(b: dict) -> dict:
