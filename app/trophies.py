@@ -307,13 +307,11 @@ def giant_killer(b: dict) -> dict:
 
 
 def giant_slain(b: dict) -> dict:
-    """Your top-16 team gets knocked out by a lower-ranked side in the knockouts."""
+    """Your top-16 team loses to a lower-ranked side (any stage)."""
     from data import _on_pitch, _winner_loser
     owner = b["owner"]
     by_player: dict[str, list] = {}
     for m in b["_matches"]:
-        if m.get("group"):  # knockouts only
-            continue
         sc = _on_pitch(m.get("score"))
         if sc is None or sc[0] == sc[1]:
             continue
@@ -870,7 +868,7 @@ AWARDS = [
     {"icon": "✨", "name": "Treble Dream", "blurb": "All three of your teams reach the knockouts", "fn": treble_dream},
     {"icon": "🎩", "name": "Hat-trick Hero", "blurb": "A player on one of your teams scores 3+ in a game", "fn": hat_trick_hero},
     {"icon": "🗡️", "name": "Giant Killer", "blurb": "One of your underdogs beats a top-16 side", "fn": giant_killer},
-    {"icon": "💀", "name": "Giant Slain", "blurb": "One of your top-16 teams gets knocked out by a lower-ranked side", "fn": giant_slain, "booby": True},
+    {"icon": "💀", "name": "Giant Slain", "blurb": "One of your top-16 teams loses to a lower-ranked side", "fn": giant_slain, "booby": True},
     {"icon": "👠", "name": "Cinderella", "blurb": "One of your bottom-16 teams reaches the knockouts", "fn": cinderella},
     {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your team wins after trailing at half-time", "fn": comeback_kings},
     {"icon": "👑", "name": "Golden Owner", "blurb": "You own the tournament's top goalscorer", "fn": golden_owner},
