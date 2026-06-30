@@ -1051,7 +1051,7 @@ AWARDS = [
     {"icon": "✨", "name": "Treble Dream", "blurb": "All three of your teams reach the knockouts", "fn": treble_dream},
     # ── Hall of Shame (A-Z) ─────────────────────────────────────────────────
     {"icon": "🟨", "name": "Bad Boys", "blurb": "Your three teams rack up the most yellow cards", "fn": bad_boys, "booby": True},
-    {"icon": "🟥", "name": "Bad Boys Red", "blurb": "Your three teams rack up the most red cards", "fn": seeing_red, "booby": True},
+    {"icon": "🟥", "name": "Badder Boys", "blurb": "Your three teams rack up the most red cards", "fn": seeing_red, "booby": True},
     {"icon": "📉", "name": "Biggest Collapse", "blurb": "Your team had the biggest half-time lead and still didn't win", "fn": biggest_collapse, "booby": True},
     {"icon": "😴", "name": "Bore Draw King", "blurb": "Your teams featured in the most 0-0 draws", "fn": bore_draw_king, "booby": True},
     {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
