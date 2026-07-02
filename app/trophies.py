@@ -1217,6 +1217,40 @@ def snatched_defeat(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
+def great_escape(b: dict) -> dict:
+    """The comeback record and mirror of Snatched Defeat: the longest a team spent behind
+    in a game it ultimately WON. Only sides that trailed, turned it round and won count."""
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    best_time, best = 0, []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        winner, _ = _winner_loser(m, sc)
+        if not winner or not owner.get(winner):
+            continue
+        opp = m["team2"] if winner == m["team1"] else m["team1"]
+        behind = _minutes_ahead(m, opp)  # time the opponent led == time the winner trailed
+        if behind <= 0:
+            continue
+        entry = (behind, winner, opp, max(sc), min(sc))
+        if behind > best_time:
+            best_time, best = behind, [entry]
+        elif behind == best_time:
+            best.append(entry)
+    if best_time <= 0:
+        return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for behind, winner, opp, hi, lo in best:
+        entry = by_player.setdefault(owner[winner], {"teams": set(), "details": []})
+        entry["teams"].add(winner)
+        entry["details"].append(f"{winner} trailed ~{behind}' then beat {opp} {hi}–{lo}")
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
 AWARDS = [
     # ── Hall of Fame (A-Z) ──────────────────────────────────────────────────
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
@@ -1237,6 +1271,7 @@ AWARDS = [
     {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
     {"icon": "🎰", "name": "The Full Set", "blurb": "All three of your teams win at least one game", "fn": the_full_set},
     {"icon": "🎭", "name": "The Entertainers", "blurb": "Your teams' games rack up the most goals (scored + conceded)", "fn": the_entertainers},
+    {"icon": "🪂", "name": "The Great Escape", "blurb": "Trailed the longest in a game you ultimately won", "fn": great_escape},
     {"icon": "🔝", "name": "Top Team", "blurb": "Owns the single highest-scoring team", "fn": top_team},
     {"icon": "✨", "name": "Treble Dream", "blurb": "All three of your teams reach the knockouts", "fn": treble_dream},
     # ── Hall of Shame (A-Z) ─────────────────────────────────────────────────
