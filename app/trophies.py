@@ -121,7 +121,7 @@ def total_wipeout(b: dict) -> dict:
 
 
 def bottlers(b: dict) -> dict:
-    """Player whose 3 teams have bottled the most leads (led at HT, failed to win)."""
+    """Player whose 3 teams have bottled the most leads (led at HT, then lost)."""
     from data import _on_pitch
     owner = b["owner"]
     by_player: dict[str, dict] = {}
@@ -131,13 +131,13 @@ def bottlers(b: dict) -> dict:
         if ft is None or not ht:
             continue
         (a_ft, b_ft), (a_ht, b_ht) = ft, ht
-        if a_ht > b_ht and a_ft <= b_ft and owner.get(m["team1"]):
+        if a_ht > b_ht and a_ft < b_ft and owner.get(m["team1"]):
             p = owner[m["team1"]]
             entry = by_player.setdefault(p, {"count": 0, "teams": set(), "details": []})
             entry["count"] += 1
             entry["teams"].add(m["team1"])
             entry["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
-        if b_ht > a_ht and b_ft <= a_ft and owner.get(m["team2"]):
+        if b_ht > a_ht and b_ft < a_ft and owner.get(m["team2"]):
             p = owner[m["team2"]]
             entry = by_player.setdefault(p, {"count": 0, "teams": set(), "details": []})
             entry["count"] += 1
@@ -739,46 +739,6 @@ def penalty_loser(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
-def biggest_collapse(b: dict) -> dict:
-    """Your team had the biggest half-time lead but failed to win."""
-    from data import _on_pitch
-    owner = b["owner"]
-    best_swing, best = 0, []
-    for m in b["_matches"]:
-        sc = _on_pitch(m.get("score"))
-        ht = (m.get("score") or {}).get("ht")
-        if sc is None or not ht:
-            continue
-        for team, ht_for, ht_ag, ft_for, ft_ag in (
-            (m["team1"], ht[0], ht[1], sc[0], sc[1]),
-            (m["team2"], ht[1], ht[0], sc[1], sc[0]),
-        ):
-            lead = ht_for - ht_ag
-            if lead <= 0:
-                continue  # wasn't winning at HT
-            if ft_for >= ft_ag:
-                continue  # held on — no collapse
-            swing = lead + (ft_ag - ft_for)  # HT lead + points lost
-            if owner.get(team):
-                entry = (swing, team, lead, ft_for, ft_ag, m["team1"], m["team2"])
-                if swing > best_swing:
-                    best_swing, best = swing, [entry]
-                elif swing == best_swing:
-                    best.append(entry)
-    if not best:
-        return {"status": "open"}
-    by_player: dict[str, list] = {}
-    details: dict[str, list] = {}
-    for swing, team, lead, ff, fa, t1, t2 in best:
-        opp = t2 if team == t1 else t1
-        p = owner[team]
-        by_player.setdefault(p, []).append(team)
-        details.setdefault(p, []).append(f"{team} led {lead}-0 at HT, lost to {opp}")
-    holder_lines = [{"holder": p, "teams": ts, "detail": " · ".join(details[p])}
-                    for p, ts in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
-
-
 def colander(b: dict) -> dict:
     """Player whose 3 teams have collectively kept the fewest clean sheets."""
     from data import _on_pitch
@@ -1137,6 +1097,126 @@ def badder_boys(b: dict) -> dict:
     return {"status": "won", "holders": sorted(winners), "holder_lines": holder_lines}
 
 
+def heartbreakers(b: dict) -> dict:
+    """Player whose 3 teams have suffered the most one-goal defeats — the nearly-men.
+    A level score decided on penalties isn't a one-goal defeat (that's Penalty Loser)."""
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    by_player: dict[str, dict] = {}
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None or sc[0] == sc[1] or abs(sc[0] - sc[1]) != 1:
+            continue
+        _, loser = _winner_loser(m, sc)
+        if not loser or not owner.get(loser):
+            continue
+        winner = m["team2"] if loser == m["team1"] else m["team1"]
+        p = owner[loser]
+        entry = by_player.setdefault(p, {"count": 0, "teams": set(), "details": []})
+        entry["count"] += 1
+        entry["teams"].add(loser)
+        entry["details"].append(f"{loser} {min(sc)}–{max(sc)} {winner}")
+    top = max((v["count"] for v in by_player.values()), default=0)
+    if top == 0:
+        return {"status": "open"}
+    winners = {p: v for p, v in by_player.items() if v["count"] == top}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"{top} one-goal defeat{'s' if top != 1 else ''} · " + " · ".join(v["details"])}
+        for p, v in sorted(winners.items())
+    ]
+    return {"status": "won", "holders": sorted(winners), "holder_lines": holder_lines}
+
+
+def serial_losers(b: dict) -> dict:
+    """Player whose 3 teams have lost the most games (shootout defeats included)."""
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    by_player: dict[str, dict] = {}
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        _, loser = _winner_loser(m, sc)
+        if not loser or not owner.get(loser):
+            continue
+        entry = by_player.setdefault(owner[loser], {"count": 0, "teams": {}})
+        entry["count"] += 1
+        entry["teams"][loser] = entry["teams"].get(loser, 0) + 1
+    top = max((v["count"] for v in by_player.values()), default=0)
+    if top == 0:
+        return {"status": "open"}
+    winners = {p: v for p, v in by_player.items() if v["count"] == top}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"{top} defeat{'s' if top != 1 else ''} · "
+                   + " · ".join(f"{t} ×{c}" if c > 1 else t for t, c in sorted(v["teams"].items()))}
+        for p, v in sorted(winners.items())
+    ]
+    return {"status": "won", "holders": sorted(winners), "holder_lines": holder_lines}
+
+
+def _minutes_ahead(m: dict, team: str) -> int:
+    """Approx minutes `team` spent strictly in front during a match (90', or 120' if it
+    went to extra time), reconstructed from goal timings. Stoppage time isn't modelled,
+    so this is a fair-comparison estimate rather than the exact clock."""
+    from data import _on_pitch
+    sc = _on_pitch(m.get("score"))
+    if sc is None:
+        return 0
+    end = 120 if (m.get("score") or {}).get("et") else 90
+    events = ([(_minute(g) + _offset(g) / 100.0, 1) for g in (m.get("goals1") or [])]
+              + [(_minute(g) + _offset(g) / 100.0, 2) for g in (m.get("goals2") or [])])
+    events.sort()
+    side = 1 if team == m["team1"] else 2
+    s1 = s2 = 0
+    t = 0.0
+    ahead = 0.0
+    for mn, who in events:
+        lead = (s1 - s2) if side == 1 else (s2 - s1)
+        if lead > 0:
+            ahead += mn - t
+        s1, s2 = (s1 + 1, s2) if who == 1 else (s1, s2 + 1)
+        t = mn
+    if ((s1 - s2) if side == 1 else (s2 - s1)) > 0:
+        ahead += end - t
+    return round(ahead)
+
+
+def snatched_defeat(b: dict) -> dict:
+    """The record for throwing it away: the longest a team held the lead in a game it
+    ultimately LOST. Only counts sides that led, got pegged back and were beaten."""
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    best_time, best = 0, []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        _, loser = _winner_loser(m, sc)
+        if not loser or not owner.get(loser):
+            continue
+        ahead = _minutes_ahead(m, loser)
+        if ahead <= 0:
+            continue
+        opp = m["team2"] if loser == m["team1"] else m["team1"]
+        entry = (ahead, loser, opp, min(sc), max(sc))
+        if ahead > best_time:
+            best_time, best = ahead, [entry]
+        elif ahead == best_time:
+            best.append(entry)
+    if best_time <= 0:
+        return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for ahead, loser, opp, lo, hi in best:
+        entry = by_player.setdefault(owner[loser], {"teams": set(), "details": []})
+        entry["teams"].add(loser)
+        entry["details"].append(f"{loser} led ~{ahead}' then lost {lo}–{hi} to {opp}")
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
 AWARDS = [
     # ── Hall of Fame (A-Z) ──────────────────────────────────────────────────
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
@@ -1162,14 +1242,14 @@ AWARDS = [
     # ── Hall of Shame (A-Z) ─────────────────────────────────────────────────
     {"icon": "🟨", "name": "Bad Boys", "blurb": "Your three teams rack up the most yellow cards", "fn": bad_boys, "booby": True},
     {"icon": "🟥", "name": "Badder Boys", "blurb": "Your three teams rack up the most red cards", "fn": badder_boys, "booby": True},
-    {"icon": "📉", "name": "Biggest Collapse", "blurb": "Your team had the biggest half-time lead and still didn't win", "fn": biggest_collapse, "booby": True},
     {"icon": "😴", "name": "Bore Draw King", "blurb": "Your teams featured in the most 0-0 draws", "fn": bore_draw_king, "booby": True},
-    {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and failed to win", "fn": bottlers, "booby": True},
+    {"icon": "😬", "name": "Bottlers", "blurb": "Your team led at half-time and then lost", "fn": bottlers, "booby": True},
     {"icon": "🏜️", "name": "Clean Sheet Drought", "blurb": "Your 3 teams collectively keep the fewest clean sheets", "fn": colander, "booby": True},
     {"icon": "🚪", "name": "First Out - Groups", "blurb": "Own the first team eliminated from the group stage (fewest points, worst record)", "fn": first_out_group, "booby": True},
     {"icon": "🪦", "name": "First Out - Knockouts", "blurb": "Own the first team knocked out in the knockouts", "fn": first_to_fall, "booby": True},
     {"icon": "💀", "name": "Giant Slain", "blurb": "One of your top-16 teams loses to a lower-ranked side", "fn": giant_slain, "booby": True},
     {"icon": "🤐", "name": "Goal Shy", "blurb": "One of your teams fails to score in the group stage", "fn": goal_shy, "booby": True},
+    {"icon": "💔", "name": "Heartbreakers", "blurb": "Your 3 teams suffer the most one-goal defeats", "fn": heartbreakers, "booby": True},
     {"icon": "🕳️", "name": "Leaky Sieve", "blurb": "Your team conceded the most goals", "fn": leaky_sieve, "booby": True},
     {"icon": "🤦", "name": "Own Goal King", "blurb": "Your teams scored the most own goals", "fn": own_goal_king, "booby": True},
     {"icon": "🫀", "name": "Penalty Loser", "blurb": "Your team is knocked out on penalties", "fn": penalty_loser, "booby": True},
@@ -1177,7 +1257,9 @@ AWARDS = [
     {"icon": "🅿️", "name": "Pointless", "blurb": "One of your teams finishes the groups on 0 points", "fn": pointless, "booby": True},
     {"icon": "👑", "name": "Ranking Spanking", "blurb": "Your highest-ranked team suffers the biggest upset defeat by ranking", "fn": ranking_spanking, "booby": True},
     {"icon": "🟥", "name": "Seeing Red", "blurb": "Own a team that gets a player sent off", "fn": seeing_red, "booby": True},
+    {"icon": "🥊", "name": "Serial Losers", "blurb": "Your three teams rack up the most defeats", "fn": serial_losers, "booby": True},
     {"icon": "🦆", "name": "Sitting Duck", "blurb": "Own the team that concedes the fastest goal", "fn": sitting_duck, "booby": True},
+    {"icon": "🍾", "name": "Snatched Defeat", "blurb": "Held the lead the longest in a game you ultimately lost", "fn": snatched_defeat, "booby": True},
     {"icon": "🧎", "name": "Whipping Boys", "blurb": "Own the team on the wrong end of the Biggest Thrashing", "fn": whipping_boys, "booby": True},
 ]
 
