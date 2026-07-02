@@ -1217,6 +1217,102 @@ def snatched_defeat(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
+def _lead_profile(m: dict, team: str) -> tuple[int, int, int, int]:
+    """From goal timings, for `team`: (peak lead, peak deficit, minute last pegged back
+    from a lead, minute last drawn level/ahead from a deficit). Minutes are 0 if it never
+    happened. Powers the magnitude-based collapse/comeback trophies."""
+    events = sorted(
+        [(_minute(g) + _offset(g) / 100.0, 1) for g in (m.get("goals1") or [])]
+        + [(_minute(g) + _offset(g) / 100.0, 2) for g in (m.get("goals2") or [])]
+    )
+    side = 1 if team == m["team1"] else 2
+    s1 = s2 = 0
+    peak_lead = peak_deficit = caught = recovered = 0
+    prev = 0
+    for mn, who in events:
+        s1, s2 = (s1 + 1, s2) if who == 1 else (s1, s2 + 1)
+        lead = (s1 - s2) if side == 1 else (s2 - s1)
+        peak_lead = max(peak_lead, lead)
+        peak_deficit = max(peak_deficit, -lead)
+        if prev > 0 and lead <= 0:
+            caught = round(mn)
+        if prev < 0 and lead >= 0:
+            recovered = round(mn)
+        prev = lead
+    return peak_lead, peak_deficit, caught, recovered
+
+
+def most_brutal_collapse(b: dict) -> dict:
+    """The most brutal blown lead: the biggest lead a team held and still LOST, ties broken
+    by a later collapse. Magnitude-and-lateness — where Bottlers counts and Snatched Defeat
+    times."""
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    best_key, best = (0, 0), []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        _, loser = _winner_loser(m, sc)
+        if not loser or not owner.get(loser):
+            continue
+        peak_lead, _, caught, _ = _lead_profile(m, loser)
+        if peak_lead <= 0:
+            continue
+        key = (peak_lead, caught)
+        opp = m["team2"] if loser == m["team1"] else m["team1"]
+        entry = (key, loser, opp, max(sc), min(sc), peak_lead, caught)
+        if key > best_key:
+            best_key, best = key, [entry]
+        elif key == best_key:
+            best.append(entry)
+    if best_key == (0, 0):
+        return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for key, loser, opp, hi, lo, pk, caught in best:
+        entry = by_player.setdefault(owner[loser], {"teams": set(), "details": []})
+        entry["teams"].add(loser)
+        entry["details"].append(f"{loser} led by {pk}, pegged back at {caught}', lost {lo}–{hi} to {opp}")
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
+def great_comeback(b: dict) -> dict:
+    """The mirror of Most Brutal Collapse: the biggest deficit a team clawed back to WIN,
+    ties broken by how late they were still behind."""
+    from data import _on_pitch, _winner_loser
+    owner = b["owner"]
+    best_key, best = (0, 0), []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        winner, _ = _winner_loser(m, sc)
+        if not winner or not owner.get(winner):
+            continue
+        _, peak_deficit, _, recovered = _lead_profile(m, winner)
+        if peak_deficit <= 0:
+            continue
+        key = (peak_deficit, recovered)
+        opp = m["team2"] if winner == m["team1"] else m["team1"]
+        entry = (key, winner, opp, max(sc), min(sc), peak_deficit, recovered)
+        if key > best_key:
+            best_key, best = key, [entry]
+        elif key == best_key:
+            best.append(entry)
+    if best_key == (0, 0):
+        return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for key, winner, opp, hi, lo, dfc, rec in best:
+        entry = by_player.setdefault(owner[winner], {"teams": set(), "details": []})
+        entry["teams"].add(winner)
+        entry["details"].append(f"{winner} came from {dfc} down (behind until {rec}'), beat {opp} {hi}–{lo}")
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
 def great_escape(b: dict) -> dict:
     """The comeback record and mirror of Snatched Defeat: the longest a team spent behind
     in a game it ultimately WON. Only sides that trailed, turned it round and won count."""
@@ -1271,6 +1367,7 @@ AWARDS = [
     {"icon": "🛡️", "name": "Ten Men", "blurb": "Own a team that gets a red card but still wins or draws", "fn": ten_men},
     {"icon": "🎰", "name": "The Full Set", "blurb": "All three of your teams win at least one game", "fn": the_full_set},
     {"icon": "🎭", "name": "The Entertainers", "blurb": "Your teams' games rack up the most goals (scored + conceded)", "fn": the_entertainers},
+    {"icon": "🔥", "name": "The Great Comeback", "blurb": "The biggest deficit your team clawed back to win (latest fightback breaks ties)", "fn": great_comeback},
     {"icon": "🪂", "name": "The Great Escape", "blurb": "Trailed the longest in a game you ultimately won", "fn": great_escape},
     {"icon": "🔝", "name": "Top Team", "blurb": "Owns the single highest-scoring team", "fn": top_team},
     {"icon": "✨", "name": "Treble Dream", "blurb": "All three of your teams reach the knockouts", "fn": treble_dream},
@@ -1286,6 +1383,7 @@ AWARDS = [
     {"icon": "🤐", "name": "Goal Shy", "blurb": "One of your teams fails to score in the group stage", "fn": goal_shy, "booby": True},
     {"icon": "💔", "name": "Heartbreakers", "blurb": "Your 3 teams suffer the most one-goal defeats", "fn": heartbreakers, "booby": True},
     {"icon": "🕳️", "name": "Leaky Sieve", "blurb": "Your team conceded the most goals", "fn": leaky_sieve, "booby": True},
+    {"icon": "🌋", "name": "Most Brutal Collapse", "blurb": "The biggest lead your team threw away in a defeat (latest collapse breaks ties)", "fn": most_brutal_collapse, "booby": True},
     {"icon": "🤦", "name": "Own Goal King", "blurb": "Your teams scored the most own goals", "fn": own_goal_king, "booby": True},
     {"icon": "🫀", "name": "Penalty Loser", "blurb": "Your team is knocked out on penalties", "fn": penalty_loser, "booby": True},
     {"icon": "🥅", "name": "Penalty Villain", "blurb": "Your team's player misses or has a penalty saved in open play", "fn": penalty_villain, "booby": True},
