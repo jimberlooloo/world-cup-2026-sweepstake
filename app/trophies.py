@@ -468,9 +468,11 @@ def cinderella(b: dict) -> dict:
 
 
 def comeback_kings(b: dict) -> dict:
+    """Player whose 3 teams have completed the most comebacks — trailed at half-time, won
+    at full-time. The mirror of Bottlers."""
     from data import _on_pitch
     owner = b["owner"]
-    by_player: dict[str, list] = {}
+    by_player: dict[str, dict] = {}
     for m in b["_matches"]:
         ft = _on_pitch(m.get("score"))
         ht = (m.get("score") or {}).get("ht")
@@ -478,20 +480,22 @@ def comeback_kings(b: dict) -> dict:
             continue
         (a_ft, b_ft), (a_ht, b_ht) = ft, ht
         if a_ht < b_ht and a_ft > b_ft and owner.get(m["team1"]):
-            p = owner[m["team1"]]
-            by_player.setdefault(p, {"teams": [], "details": []})
-            by_player[p]["teams"].append(m["team1"])
-            by_player[p]["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
+            entry = by_player.setdefault(owner[m["team1"]], {"count": 0, "teams": set(), "details": []})
+            entry["count"] += 1
+            entry["teams"].add(m["team1"])
+            entry["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
         if b_ht < a_ht and b_ft > a_ft and owner.get(m["team2"]):
-            p = owner[m["team2"]]
-            by_player.setdefault(p, {"teams": [], "details": []})
-            by_player[p]["teams"].append(m["team2"])
-            by_player[p]["details"].append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
-    if not by_player:
+            entry = by_player.setdefault(owner[m["team2"]], {"count": 0, "teams": set(), "details": []})
+            entry["count"] += 1
+            entry["teams"].add(m["team2"])
+            entry["details"].append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
+    top = max((v["count"] for v in by_player.values()), default=0)
+    if top == 0:
         return {"status": "open"}
-    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
-                    for p, v in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+    winners = {p: v for p, v in by_player.items() if v["count"] == top}
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(winners.items())]
+    return {"status": "won", "holders": sorted(winners), "holder_lines": holder_lines}
 
 
 def golden_owner(b: dict) -> dict:
@@ -1635,7 +1639,7 @@ AWARDS = [
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
     {"icon": "🔔", "name": "Buzzer Beater", "blurb": "Own the team that scored the latest winning goal in the knockouts", "fn": buzzer_beater},
     {"icon": "👠", "name": "Cinderella", "blurb": "One of your bottom-16 teams reaches the knockouts", "fn": cinderella},
-    {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your team wins after trailing at half-time", "fn": comeback_kings},
+    {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your 3 teams complete the most comebacks (trail at half-time, then win)", "fn": comeback_kings},
     {"icon": "🐎", "name": "Dark Horse", "blurb": "Own the highest-scoring bottom-pot team in the sweepstake", "fn": dark_horse},
     {"icon": "⏰", "name": "Early Bird", "blurb": "Own the team that scored the tournament's fastest goal", "fn": early_bird},
     {"icon": "🧚", "name": "Fairytale", "blurb": "Own the furthest-advancing bottom-16 team", "fn": fairytale},
