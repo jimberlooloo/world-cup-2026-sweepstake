@@ -329,7 +329,7 @@ def overall(teams: list[dict], matches: list[dict]) -> dict:
         "standings": standings,
         "status": team_status(matches, standings, valid),
         "fixtures": group_fixtures(matches),
-        "played": sum(1 for m in matches if is_played(m)),
+        "played": sum(1 for m in matches if is_played(m) and not m.get("live")),
         "total": len(matches),
         "_matches": matches,  # raw feed, for the wall-chart bracket
         "_valid": valid,
