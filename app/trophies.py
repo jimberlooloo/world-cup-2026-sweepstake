@@ -1559,11 +1559,11 @@ def golden_goal(b: dict) -> dict:
 
 
 def buzzer_beater(b: dict) -> dict:
-    """Own a team that scored a 90th-minute-or-later winning goal in the knockouts — a
-    genuine last-gasp winner (the goal that broke the deadlock to win)."""
+    """Own the team that scored the LATEST winning goal in the knockouts — the closest to
+    the final whistle (the goal that broke the deadlock to win)."""
     from data import _on_pitch, _winner_loser
     owner = b["owner"]
-    by_player: dict[str, dict] = {}
+    best_clock, best = -1, []
     for m in b["_matches"]:
         if m.get("group"):
             continue
@@ -1579,13 +1579,20 @@ def buzzer_beater(b: dict) -> dict:
         if len(goals) <= min(sc):
             continue  # decided on penalties — no winning goal in play
         wg = goals[min(sc)]  # the (loser + 1)th goal = the one that won it
-        if _minute(wg) >= 90:
-            opp = m["team2"] if winner == m["team1"] else m["team1"]
-            entry = by_player.setdefault(owner[winner], {"teams": set(), "details": []})
-            entry["teams"].add(winner)
-            entry["details"].append(f"{wg.get('name', '?')} {wg.get('minute')}' v {opp} ({winner})")
-    if not by_player:
+        clock = _minute(wg) + _offset(wg)
+        opp = m["team2"] if winner == m["team1"] else m["team1"]
+        entry = (winner, wg.get("name", "?"), wg.get("minute"), opp)
+        if clock > best_clock:
+            best_clock, best = clock, [entry]
+        elif clock == best_clock:
+            best.append(entry)
+    if best_clock < 0:
         return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for winner, scorer, label, opp in best:
+        entry = by_player.setdefault(owner[winner], {"teams": set(), "details": []})
+        entry["teams"].add(winner)
+        entry["details"].append(f"{scorer} {label}' v {opp} ({winner})")
     holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
                     for p, v in sorted(by_player.items())]
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
@@ -1648,7 +1655,7 @@ AWARDS = [
     # ── Hall of Fame (A-Z) ──────────────────────────────────────────────────
     {"icon": "🎖️", "name": "Against All Odds", "blurb": "Own the furthest-advancing team ranked outside the top 16", "fn": against_all_odds},
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
-    {"icon": "🔔", "name": "Buzzer Beater", "blurb": "Own a team that scores a 90th-minute-or-later winning goal in the knockouts", "fn": buzzer_beater},
+    {"icon": "🔔", "name": "Buzzer Beater", "blurb": "Own the team that scored the latest winning goal in the knockouts", "fn": buzzer_beater},
     {"icon": "👠", "name": "Cinderella", "blurb": "One of your bottom-16 teams reaches the knockouts", "fn": cinderella},
     {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your team wins after trailing at half-time", "fn": comeback_kings},
     {"icon": "🐎", "name": "Dark Horse", "blurb": "Own the highest-scoring bottom-pot team in the sweepstake", "fn": dark_horse},
