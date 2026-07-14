@@ -275,7 +275,7 @@ _RANKING = [
     "DR Congo", "Iraq", "South Africa", "Jordan", "Cape Verde", "Ghana",
     "Bosnia & Herzegovina", "Curaçao", "Haiti", "New Zealand",
 ]
-POT1, POT3 = set(_RANKING[0:16]), set(_RANKING[32:48])
+POT1, POT2, POT3 = set(_RANKING[0:16]), set(_RANKING[16:32]), set(_RANKING[32:48])
 
 
 def _played_count(b: dict) -> dict[str, int]:
@@ -1591,14 +1591,69 @@ def buzzer_beater(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
+def _furthest_round(b: dict) -> dict:
+    """Deepest knockout round rank each real team reached (as a competitor). Absent = group
+    stage only. Higher rank = deeper round (see KNOCKOUT_ROUNDS)."""
+    from data import _ko_round_rank
+    valid = b["_valid"]
+    furthest: dict[str, int] = {}
+    for m in b["_matches"]:
+        r = _ko_round_rank(m.get("round", ""))
+        if r < 0:
+            continue
+        for t in (m["team1"], m["team2"]):
+            if t in valid:
+                furthest[t] = max(furthest.get(t, -1), r)
+    return furthest
+
+
+def _deepest_underdog(b: dict, pool: set) -> dict:
+    """Shared resolver: the furthest-advancing owned team drawn from `pool`, ties broken in
+    favour of the lowest-ranked (biggest underdog) side."""
+    from data import KNOCKOUT_ROUNDS
+    owner = b["owner"]
+    rank = {t: i for i, t in enumerate(_RANKING)}
+    furthest = _furthest_round(b)
+    cands = [(furthest[t], rank[t], t) for t in furthest
+             if t in pool and t in rank and owner.get(t)]
+    if not cands:
+        return {"status": "open"}
+    best_round = max(c[0] for c in cands)
+    deepest = [c for c in cands if c[0] == best_round]
+    worst_rank = max(c[1] for c in deepest)  # lowest-ranked among the deepest = the underdog
+    winners = [c for c in deepest if c[1] == worst_rank]
+    stage = KNOCKOUT_ROUNDS[best_round]
+    by_player: dict[str, dict] = {}
+    for _, ri, t in winners:
+        entry = by_player.setdefault(owner[t], {"teams": set(), "details": []})
+        entry["teams"].add(t)
+        entry["details"].append(f"{t} (#{ri + 1}) reached the {stage}")
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
+def against_all_odds(b: dict) -> dict:
+    """Own the furthest-advancing team ranked outside the top 16 — the deepest run by a
+    non-favourite (lowest-ranked breaks ties)."""
+    return _deepest_underdog(b, POT2 | POT3)
+
+
+def fairytale(b: dict) -> dict:
+    """Own the furthest-advancing bottom-16 (Pot 3) team — the ultimate minnow run."""
+    return _deepest_underdog(b, POT3)
+
+
 AWARDS = [
     # ── Hall of Fame (A-Z) ──────────────────────────────────────────────────
+    {"icon": "🎖️", "name": "Against All Odds", "blurb": "Own the furthest-advancing team ranked outside the top 16", "fn": against_all_odds},
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
     {"icon": "🔔", "name": "Buzzer Beater", "blurb": "Own a team that scores a 90th-minute-or-later winning goal in the knockouts", "fn": buzzer_beater},
     {"icon": "👠", "name": "Cinderella", "blurb": "One of your bottom-16 teams reaches the knockouts", "fn": cinderella},
     {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your team wins after trailing at half-time", "fn": comeback_kings},
     {"icon": "🐎", "name": "Dark Horse", "blurb": "Own the highest-scoring bottom-pot team in the sweepstake", "fn": dark_horse},
     {"icon": "⏰", "name": "Early Bird", "blurb": "Own the team that scored the tournament's fastest goal", "fn": early_bird},
+    {"icon": "🧚", "name": "Fairytale", "blurb": "Own the furthest-advancing bottom-16 team", "fn": fairytale},
     {"icon": "🩸", "name": "First Blood", "blurb": "Owned the team that scored the tournament's first goal", "fn": first_blood},
     {"icon": "🗡️", "name": "Giant Killer", "blurb": "One of your underdogs beats a top-16 side", "fn": giant_killer},
     {"icon": "🌪️", "name": "Goal Rush", "blurb": "Own the team that scored the most goals in a single game", "fn": goal_rush},
