@@ -1536,28 +1536,6 @@ def host_hunter(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
-def golden_goal(b: dict) -> dict:
-    """Own a team that scored in extra time of a knockout tie — the deepest clutch moment."""
-    owner = b["owner"]
-    by_player: dict[str, dict] = {}
-    for m in b["_matches"]:
-        if not (m.get("score") or {}).get("et"):
-            continue
-        for team, gl in ((m["team1"], m.get("goals1")), (m["team2"], m.get("goals2"))):
-            if not owner.get(team):
-                continue
-            for g in (gl or []):
-                if not g.get("owngoal") and _minute(g) > 90:  # >90 = extra time, not stoppage
-                    entry = by_player.setdefault(owner[team], {"teams": set(), "details": []})
-                    entry["teams"].add(team)
-                    entry["details"].append(f"{g.get('name', '?')} {g.get('minute')}' ({team})")
-    if not by_player:
-        return {"status": "open"}
-    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
-                    for p, v in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
-
-
 def buzzer_beater(b: dict) -> dict:
     """Own the team that scored the LATEST winning goal in the knockouts — the closest to
     the final whistle (the goal that broke the deadlock to win)."""
@@ -1664,7 +1642,6 @@ AWARDS = [
     {"icon": "🩸", "name": "First Blood", "blurb": "Owned the team that scored the tournament's first goal", "fn": first_blood},
     {"icon": "🗡️", "name": "Giant Killer", "blurb": "One of your underdogs beats a top-16 side", "fn": giant_killer},
     {"icon": "🌪️", "name": "Goal Rush", "blurb": "Own the team that scored the most goals in a single game", "fn": goal_rush},
-    {"icon": "🥇", "name": "Golden Goal", "blurb": "Own a team that scores in extra time of a knockout tie", "fn": golden_goal},
     {"icon": "👑", "name": "Golden Owner", "blurb": "You own the tournament's top goalscorer", "fn": golden_owner},
     {"icon": "🎩", "name": "Hat-trick Hero", "blurb": "A player on one of your teams scores 3+ in a game", "fn": hat_trick_hero},
     {"icon": "🏹", "name": "Host Hunter", "blurb": "Own a team that beats a 2026 host nation (USA, Canada or Mexico)", "fn": host_hunter},
