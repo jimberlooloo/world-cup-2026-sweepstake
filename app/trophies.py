@@ -1313,6 +1313,93 @@ def great_comeback(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
+def quickfire_double(b: dict) -> dict:
+    """Smallest gap between two goals your team scored in the same match — the fastest
+    one-two. A moment of magic open to any side, minnow or giant."""
+    from data import _on_pitch
+    owner = b["owner"]
+    best_gap, best = None, []
+    for m in b["_matches"]:
+        if _on_pitch(m.get("score")) is None:
+            continue
+        for team, gl in ((m["team1"], m.get("goals1")), (m["team2"], m.get("goals2"))):
+            if not owner.get(team):
+                continue
+            goals = sorted((_minute(g) + _offset(g), g.get("minute", ""))
+                           for g in (gl or []) if not g.get("owngoal"))
+            for (t1, l1), (t2, l2) in zip(goals, goals[1:]):
+                gap = t2 - t1
+                opp = m["team2"] if team == m["team1"] else m["team1"]
+                entry = (gap, team, l1, l2, opp)
+                if best_gap is None or gap < best_gap:
+                    best_gap, best = gap, [entry]
+                elif gap == best_gap:
+                    best.append(entry)
+    if best_gap is None:
+        return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for gap, team, l1, l2, opp in best:
+        when = "in the same minute" if gap == 0 else f"just {gap}' apart"
+        entry = by_player.setdefault(owner[team], {"teams": set(), "details": []})
+        entry["teams"].add(team)
+        entry["details"].append(f"{team} — two goals {when} ({l1}' & {l2}') v {opp}")
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
+def early_bird(b: dict) -> dict:
+    """Own the team that scored the tournament's fastest goal — the mirror of Sitting Duck."""
+    from data import _on_pitch
+    owner = b["owner"]
+    best = None  # (minute, team, scorer, label, opp)
+    for m in b["_matches"]:
+        if _on_pitch(m.get("score")) is None:
+            continue
+        for team, gl in ((m["team1"], m.get("goals1")), (m["team2"], m.get("goals2"))):
+            for g in (gl or []):
+                if g.get("owngoal"):
+                    continue
+                t = _minute(g) + _offset(g)
+                if best is None or t < best[0]:
+                    opp = m["team2"] if team == m["team1"] else m["team1"]
+                    best = (t, team, g.get("name", "?"), g.get("minute", ""), opp)
+    if best is None:
+        return {"status": "open"}
+    _, team, scorer, label, opp = best
+    return {"status": "won", "holders": [owner.get(team, "—")], "teams": [team],
+            "detail": f"{scorer} {label}' for {team} v {opp}"}
+
+
+def goal_rush(b: dict) -> dict:
+    """Own the team that put the most goals on the board in a single game."""
+    from data import _on_pitch
+    owner = b["owner"]
+    best_n, best = 0, []
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        for team, n in ((m["team1"], sc[0]), (m["team2"], sc[1])):
+            if not owner.get(team):
+                continue
+            opp = m["team2"] if team == m["team1"] else m["team1"]
+            if n > best_n:
+                best_n, best = n, [(team, opp, sc)]
+            elif n == best_n and n > 0:
+                best.append((team, opp, sc))
+    if best_n == 0:
+        return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for team, opp, sc in best:
+        entry = by_player.setdefault(owner[team], {"teams": set(), "details": []})
+        entry["teams"].add(team)
+        entry["details"].append(f"{team} {best_n} v {opp} ({max(sc)}–{min(sc)})")
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
 def great_escape(b: dict) -> dict:
     """The comeback record and mirror of Snatched Defeat: the longest a team spent behind
     in a game it ultimately WON. Only sides that trailed, turned it round and won count."""
@@ -1353,13 +1440,16 @@ AWARDS = [
     {"icon": "👠", "name": "Cinderella", "blurb": "One of your bottom-16 teams reaches the knockouts", "fn": cinderella},
     {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your team wins after trailing at half-time", "fn": comeback_kings},
     {"icon": "🐎", "name": "Dark Horse", "blurb": "Your bottom-pot team outscores both your stronger teams", "fn": dark_horse},
+    {"icon": "⏰", "name": "Early Bird", "blurb": "Own the team that scored the tournament's fastest goal", "fn": early_bird},
     {"icon": "🩸", "name": "First Blood", "blurb": "Owned the team that scored the tournament's first goal", "fn": first_blood},
     {"icon": "🗡️", "name": "Giant Killer", "blurb": "One of your underdogs beats a top-16 side", "fn": giant_killer},
+    {"icon": "🌪️", "name": "Goal Rush", "blurb": "Own the team that scored the most goals in a single game", "fn": goal_rush},
     {"icon": "👑", "name": "Golden Owner", "blurb": "You own the tournament's top goalscorer", "fn": golden_owner},
     {"icon": "🎩", "name": "Hat-trick Hero", "blurb": "A player on one of your teams scores 3+ in a game", "fn": hat_trick_hero},
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
     {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
     {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
+    {"icon": "⚡", "name": "Quickfire Double", "blurb": "Your team scores two goals with the smallest gap between them", "fn": quickfire_double},
     {"icon": "🐕", "name": "Underdog", "blurb": "Your team pulls off the biggest upset win by FIFA ranking gap", "fn": ranking_king},
     {"icon": "🎢", "name": "Rollercoaster", "blurb": "Your 3 teams' games have the most lead changes combined", "fn": rollercoaster},
     {"icon": "⏱️", "name": "Stoppage Time King", "blurb": "Your teams score the most goals in added time", "fn": stoppage_time_king},
