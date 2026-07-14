@@ -74,6 +74,9 @@ def _overlay_espn(matches: list[dict]) -> None:
         if "ft" not in score and "et" not in score:
             continue  # not enough to call it played
         m["score"] = score
+        # In-progress matches carry a live running score in `ft`; flag them so result
+        # logic (winner/loser, KO elimination) doesn't treat that as a decided result.
+        m["live"] = not ov.get("final", True)
         # Prefer openfootball goal events (more accurate); fall back to ESPN only
         # when openfootball has no goal-scorer data yet (empty goals on a played match).
         # Always merge ESPN's `sub` and `assist` fields — openfootball doesn't track these.
@@ -230,7 +233,13 @@ def _ko_round_rank(round_name: str) -> int:
 
 
 def _winner_loser(match: dict, sc: list[int]) -> tuple[str | None, str | None]:
-    """(winner, loser) for a played match, using the shootout to break a level score."""
+    """(winner, loser) for a played match, using the shootout to break a level score.
+
+    A match still in progress (`live`) has no decided result — return (None, None) so the
+    team currently trailing isn't prematurely marked out or handed a result-based trophy.
+    """
+    if match.get("live"):
+        return None, None
     a, b = sc
     if a != b:
         return (match["team1"], match["team2"]) if a > b else (match["team2"], match["team1"])

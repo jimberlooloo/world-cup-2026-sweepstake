@@ -62,6 +62,8 @@ def biggest_thrashing(b: dict) -> dict:
             continue
         margin = abs(sc[0] - sc[1])
         winner, _ = _winner_loser(m, sc)
+        if not winner:
+            continue  # still in progress — no decided result yet
         hi, lo = max(sc), min(sc)
         loser = m["team2"] if winner == m["team1"] else m["team1"]
         detail = f"{winner} {hi}–{lo} {loser}"
@@ -890,6 +892,8 @@ def whipping_boys(b: dict) -> dict:
             continue
         margin = abs(sc[0] - sc[1])
         winner, loser = _winner_loser(m, sc)
+        if not winner or not loser:
+            continue  # still in progress — no decided result yet
         detail = f"{loser} {min(sc)}–{max(sc)} {winner}"
         if margin > best_margin:
             best_margin, losers, details = margin, [loser], [detail]
@@ -970,8 +974,8 @@ def ten_men(b: dict) -> dict:
     by_player: dict[str, list] = {}
     for m in b["_matches"]:
         sc = _on_pitch(m.get("score"))
-        if sc is None:
-            continue
+        if sc is None or m.get("live"):
+            continue  # in progress: a red card here hasn't yet "won/drawn with 10"
         winner, loser = _winner_loser(m, sc)
         for cards, team in ((m.get("cards1"), m["team1"]), (m.get("cards2"), m["team2"])):
             p = owner.get(team)
