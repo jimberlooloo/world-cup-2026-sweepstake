@@ -658,18 +658,21 @@ def the_full_set(b: dict) -> dict:
 
 
 def dark_horse(b: dict) -> dict:
-    goals = b["goals"]
-    holders, details = [], []
-    for p, ts in b["allocation"].items():
-        others = [goals.get(t, 0) for t in ts if t not in POT3]
-        for t in ts:
-            if t in POT3 and goals.get(t, 0) > 0 and all(goals.get(t, 0) > o for o in others):
-                holders.append(p)
-                details.append(f"{t} ({goals.get(t, 0)})")
-                break
-    if not holders:
+    """Own the highest-scoring bottom-pot (Pot 3) team in the whole sweepstake — the
+    minnow that punched furthest above its seeding."""
+    goals, owner = b["goals"], b["owner"]
+    pot3 = {t: goals.get(t, 0) for t in POT3 if owner.get(t)}
+    top = max(pot3.values(), default=0)
+    if top == 0:
         return {"status": "open"}
-    return {"status": "won", "holders": sorted(holders), "detail": " · ".join(details)}
+    teams = [t for t, g in pot3.items() if g == top]
+    by_player: dict[str, list] = {}
+    for t in teams:
+        by_player.setdefault(owner[t], []).append(t)
+    holder_lines = [{"holder": p, "teams": ts, "detail": " · ".join(f"{t} ({top})" for t in ts)}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "teams": teams,
+            "holder_lines": holder_lines}
 
 
 def penalty_king(b: dict) -> dict:
@@ -1439,7 +1442,7 @@ AWARDS = [
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
     {"icon": "👠", "name": "Cinderella", "blurb": "One of your bottom-16 teams reaches the knockouts", "fn": cinderella},
     {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your team wins after trailing at half-time", "fn": comeback_kings},
-    {"icon": "🐎", "name": "Dark Horse", "blurb": "Your bottom-pot team outscores both your stronger teams", "fn": dark_horse},
+    {"icon": "🐎", "name": "Dark Horse", "blurb": "Own the highest-scoring bottom-pot team in the sweepstake", "fn": dark_horse},
     {"icon": "⏰", "name": "Early Bird", "blurb": "Own the team that scored the tournament's fastest goal", "fn": early_bird},
     {"icon": "🩸", "name": "First Blood", "blurb": "Owned the team that scored the tournament's first goal", "fn": first_blood},
     {"icon": "🗡️", "name": "Giant Killer", "blurb": "One of your underdogs beats a top-16 side", "fn": giant_killer},
