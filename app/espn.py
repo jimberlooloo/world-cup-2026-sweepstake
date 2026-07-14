@@ -175,24 +175,30 @@ def fetch_results() -> dict:
         except requests.RequestException:
             continue
 
-    started = list(dict.fromkeys(
-        e.get("id") for e in events
-        if (((e.get("status") or {}).get("type") or {}).get("state")) in ("in", "post")
-        and e.get("id")
-    ))
+    # eid -> ESPN state: "post" (finished) or "in" (still being played). A match still in
+    # progress carries a live running score, so its result must NOT be treated as decided.
+    state_by_id: dict[str, str] = {}
+    for e in events:
+        eid = e.get("id")
+        st = (((e.get("status") or {}).get("type") or {}).get("state"))
+        if eid and st in ("in", "post"):
+            state_by_id.setdefault(eid, st)
 
     def grab(eid: str) -> dict | None:
         try:
             resp = requests.get(f"{ESPN}/summary?event={eid}", timeout=20)
             resp.raise_for_status()
-            return parse_summary(resp.json())
         except requests.RequestException:
             return None
+        parsed = parse_summary(resp.json())
+        if parsed is not None:
+            parsed["final"] = state_by_id.get(eid) == "post"
+        return parsed
 
     out: dict = {}
-    if started:
+    if state_by_id:
         with ThreadPoolExecutor(max_workers=8) as ex:
-            for parsed in ex.map(grab, started):
+            for parsed in ex.map(grab, state_by_id):
                 if parsed and len(parsed["goals"]) == 2:
                     out[frozenset(parsed["goals"])] = parsed
     return out
