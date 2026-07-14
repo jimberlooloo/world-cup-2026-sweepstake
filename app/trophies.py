@@ -1437,6 +1437,81 @@ def great_escape(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
+def ice_cool(b: dict) -> dict:
+    """Own a team that held its nerve to win a penalty shootout — the mirror of Penalty
+    Loser."""
+    from data import _on_pitch
+    owner = b["owner"]
+    by_player: dict[str, dict] = {}
+    for m in b["_matches"]:
+        if m.get("group"):
+            continue
+        sc = _on_pitch(m.get("score"))
+        if sc is None or sc[0] != sc[1]:
+            continue  # only games level after extra time
+        p = (m.get("score") or {}).get("p")
+        if not p or p[0] == p[1]:
+            continue
+        winner = m["team1"] if p[0] > p[1] else m["team2"]
+        loser = m["team2"] if winner == m["team1"] else m["team1"]
+        entry = by_player.setdefault(owner.get(winner), {"teams": set(), "details": []}) \
+            if owner.get(winner) else None
+        if entry is not None:
+            entry["teams"].add(winner)
+            entry["details"].append(f"{winner} beat {loser} {max(p)}–{min(p)} on pens")
+    if not by_player:
+        return {"status": "open"}
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
+def perfect_group(b: dict) -> dict:
+    """Own a team that won all three of its group games — a perfect group stage."""
+    owner = b["owner"]
+    by_player: dict[str, list] = {}
+    for rows in b["standings"].values():
+        for r in rows:
+            if r["p"] == 3 and r["w"] == 3 and owner.get(r["team"]):
+                by_player.setdefault(owner[r["team"]], []).append(r["team"])
+    if not by_player:
+        return {"status": "open"}
+    holder_lines = [{"holder": p, "teams": sorted(ts),
+                     "detail": " · ".join(f"{t} (9 pts)" for t in sorted(ts))}
+                    for p, ts in sorted(by_player.items())]
+    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+
+
+def iron_curtain(b: dict) -> dict:
+    """Player whose 3 teams have kept the most clean sheets combined — the mirror of the
+    Clean Sheet Drought shame."""
+    from data import _on_pitch
+    clean: dict[str, int] = {}
+    for m in b["_matches"]:
+        sc = _on_pitch(m.get("score"))
+        if sc is None:
+            continue
+        for team, conceded in ((m["team1"], sc[1]), (m["team2"], sc[0])):
+            if conceded == 0:
+                clean[team] = clean.get(team, 0) + 1
+    by_player: dict[str, dict] = {}
+    for p, ts in b["allocation"].items():
+        total = sum(clean.get(t, 0) for t in ts)
+        if total > 0:
+            by_player[p] = {"count": total, "teams": [t for t in ts if clean.get(t, 0)]}
+    if not by_player:
+        return {"status": "open"}
+    top = max(v["count"] for v in by_player.values())
+    winners = {p: v for p, v in by_player.items() if v["count"] == top}
+    holder_lines = [
+        {"holder": p, "teams": sorted(v["teams"]),
+         "detail": f"{top} clean sheet{'s' if top != 1 else ''} · "
+                   + " · ".join(f"{t} ({clean.get(t, 0)})" for t in sorted(v["teams"]))}
+        for p, v in sorted(winners.items())
+    ]
+    return {"status": "won", "holders": sorted(winners), "holder_lines": holder_lines}
+
+
 AWARDS = [
     # ── Hall of Fame (A-Z) ──────────────────────────────────────────────────
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
@@ -1449,8 +1524,11 @@ AWARDS = [
     {"icon": "🌪️", "name": "Goal Rush", "blurb": "Own the team that scored the most goals in a single game", "fn": goal_rush},
     {"icon": "👑", "name": "Golden Owner", "blurb": "You own the tournament's top goalscorer", "fn": golden_owner},
     {"icon": "🎩", "name": "Hat-trick Hero", "blurb": "A player on one of your teams scores 3+ in a game", "fn": hat_trick_hero},
+    {"icon": "🧊", "name": "Ice Cool", "blurb": "Own a team that wins a penalty shootout", "fn": ice_cool},
+    {"icon": "🧱", "name": "Iron Curtain", "blurb": "Your 3 teams keep the most clean sheets combined", "fn": iron_curtain},
     {"icon": "⭐", "name": "Mr Everything", "blurb": "Own the player with the most goals + assists combined", "fn": mr_everything},
     {"icon": "🎯", "name": "Penalty King", "blurb": "Your teams score the most penalties", "fn": penalty_king},
+    {"icon": "💯", "name": "Perfect Group", "blurb": "Own a team that wins all three of its group games", "fn": perfect_group},
     {"icon": "🅰️", "name": "Playmaker", "blurb": "You own the tournament's top assist-maker", "fn": playmaker},
     {"icon": "⚡", "name": "Quickfire Double", "blurb": "Your team scores two goals with the smallest gap between them", "fn": quickfire_double},
     {"icon": "🐕", "name": "Underdog", "blurb": "Your team pulls off the biggest upset win by FIFA ranking gap", "fn": ranking_king},
