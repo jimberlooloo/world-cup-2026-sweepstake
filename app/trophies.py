@@ -468,9 +468,11 @@ def cinderella(b: dict) -> dict:
 
 
 def comeback_kings(b: dict) -> dict:
+    """Player whose 3 teams have completed the most comebacks — trailed at half-time, won
+    at full-time. The mirror of Bottlers."""
     from data import _on_pitch
     owner = b["owner"]
-    by_player: dict[str, list] = {}
+    by_player: dict[str, dict] = {}
     for m in b["_matches"]:
         ft = _on_pitch(m.get("score"))
         ht = (m.get("score") or {}).get("ht")
@@ -478,20 +480,22 @@ def comeback_kings(b: dict) -> dict:
             continue
         (a_ft, b_ft), (a_ht, b_ht) = ft, ht
         if a_ht < b_ht and a_ft > b_ft and owner.get(m["team1"]):
-            p = owner[m["team1"]]
-            by_player.setdefault(p, {"teams": [], "details": []})
-            by_player[p]["teams"].append(m["team1"])
-            by_player[p]["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
+            entry = by_player.setdefault(owner[m["team1"]], {"count": 0, "teams": set(), "details": []})
+            entry["count"] += 1
+            entry["teams"].add(m["team1"])
+            entry["details"].append(f"{m['team1']} ({a_ht}–{b_ht} → {a_ft}–{b_ft})")
         if b_ht < a_ht and b_ft > a_ft and owner.get(m["team2"]):
-            p = owner[m["team2"]]
-            by_player.setdefault(p, {"teams": [], "details": []})
-            by_player[p]["teams"].append(m["team2"])
-            by_player[p]["details"].append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
-    if not by_player:
+            entry = by_player.setdefault(owner[m["team2"]], {"count": 0, "teams": set(), "details": []})
+            entry["count"] += 1
+            entry["teams"].add(m["team2"])
+            entry["details"].append(f"{m['team2']} ({b_ht}–{a_ht} → {b_ft}–{a_ft})")
+    top = max((v["count"] for v in by_player.values()), default=0)
+    if top == 0:
         return {"status": "open"}
-    holder_lines = [{"holder": p, "teams": v["teams"], "detail": " · ".join(v["details"])}
-                    for p, v in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
+    winners = {p: v for p, v in by_player.items() if v["count"] == top}
+    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
+                    for p, v in sorted(winners.items())]
+    return {"status": "won", "holders": sorted(winners), "holder_lines": holder_lines}
 
 
 def golden_owner(b: dict) -> dict:
@@ -1536,34 +1540,12 @@ def host_hunter(b: dict) -> dict:
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
 
 
-def golden_goal(b: dict) -> dict:
-    """Own a team that scored in extra time of a knockout tie — the deepest clutch moment."""
-    owner = b["owner"]
-    by_player: dict[str, dict] = {}
-    for m in b["_matches"]:
-        if not (m.get("score") or {}).get("et"):
-            continue
-        for team, gl in ((m["team1"], m.get("goals1")), (m["team2"], m.get("goals2"))):
-            if not owner.get(team):
-                continue
-            for g in (gl or []):
-                if not g.get("owngoal") and _minute(g) > 90:  # >90 = extra time, not stoppage
-                    entry = by_player.setdefault(owner[team], {"teams": set(), "details": []})
-                    entry["teams"].add(team)
-                    entry["details"].append(f"{g.get('name', '?')} {g.get('minute')}' ({team})")
-    if not by_player:
-        return {"status": "open"}
-    holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
-                    for p, v in sorted(by_player.items())]
-    return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
-
-
 def buzzer_beater(b: dict) -> dict:
-    """Own a team that scored a 90th-minute-or-later winning goal in the knockouts — a
-    genuine last-gasp winner (the goal that broke the deadlock to win)."""
+    """Own the team that scored the LATEST winning goal in the knockouts — the closest to
+    the final whistle (the goal that broke the deadlock to win)."""
     from data import _on_pitch, _winner_loser
     owner = b["owner"]
-    by_player: dict[str, dict] = {}
+    best_clock, best = -1, []
     for m in b["_matches"]:
         if m.get("group"):
             continue
@@ -1579,13 +1561,20 @@ def buzzer_beater(b: dict) -> dict:
         if len(goals) <= min(sc):
             continue  # decided on penalties — no winning goal in play
         wg = goals[min(sc)]  # the (loser + 1)th goal = the one that won it
-        if _minute(wg) >= 90:
-            opp = m["team2"] if winner == m["team1"] else m["team1"]
-            entry = by_player.setdefault(owner[winner], {"teams": set(), "details": []})
-            entry["teams"].add(winner)
-            entry["details"].append(f"{wg.get('name', '?')} {wg.get('minute')}' v {opp} ({winner})")
-    if not by_player:
+        clock = _minute(wg) + _offset(wg)
+        opp = m["team2"] if winner == m["team1"] else m["team1"]
+        entry = (winner, wg.get("name", "?"), wg.get("minute"), opp)
+        if clock > best_clock:
+            best_clock, best = clock, [entry]
+        elif clock == best_clock:
+            best.append(entry)
+    if best_clock < 0:
         return {"status": "open"}
+    by_player: dict[str, dict] = {}
+    for winner, scorer, label, opp in best:
+        entry = by_player.setdefault(owner[winner], {"teams": set(), "details": []})
+        entry["teams"].add(winner)
+        entry["details"].append(f"{scorer} {label}' v {opp} ({winner})")
     holder_lines = [{"holder": p, "teams": sorted(v["teams"]), "detail": " · ".join(v["details"])}
                     for p, v in sorted(by_player.items())]
     return {"status": "won", "holders": sorted(by_player), "holder_lines": holder_lines}
@@ -1648,16 +1637,15 @@ AWARDS = [
     # ── Hall of Fame (A-Z) ──────────────────────────────────────────────────
     {"icon": "🎖️", "name": "Against All Odds", "blurb": "Own the furthest-advancing team ranked outside the top 16", "fn": against_all_odds},
     {"icon": "💥", "name": "Biggest Thrashing", "blurb": "Biggest winning margin in a single game", "fn": biggest_thrashing},
-    {"icon": "🔔", "name": "Buzzer Beater", "blurb": "Own a team that scores a 90th-minute-or-later winning goal in the knockouts", "fn": buzzer_beater},
+    {"icon": "🔔", "name": "Buzzer Beater", "blurb": "Own the team that scored the latest winning goal in the knockouts", "fn": buzzer_beater},
     {"icon": "👠", "name": "Cinderella", "blurb": "One of your bottom-16 teams reaches the knockouts", "fn": cinderella},
-    {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your team wins after trailing at half-time", "fn": comeback_kings},
+    {"icon": "🔄", "name": "Comeback Kings", "blurb": "Your 3 teams complete the most comebacks (trail at half-time, then win)", "fn": comeback_kings},
     {"icon": "🐎", "name": "Dark Horse", "blurb": "Own the highest-scoring bottom-pot team in the sweepstake", "fn": dark_horse},
     {"icon": "⏰", "name": "Early Bird", "blurb": "Own the team that scored the tournament's fastest goal", "fn": early_bird},
     {"icon": "🧚", "name": "Fairytale", "blurb": "Own the furthest-advancing bottom-16 team", "fn": fairytale},
     {"icon": "🩸", "name": "First Blood", "blurb": "Owned the team that scored the tournament's first goal", "fn": first_blood},
     {"icon": "🗡️", "name": "Giant Killer", "blurb": "One of your underdogs beats a top-16 side", "fn": giant_killer},
     {"icon": "🌪️", "name": "Goal Rush", "blurb": "Own the team that scored the most goals in a single game", "fn": goal_rush},
-    {"icon": "🥇", "name": "Golden Goal", "blurb": "Own a team that scores in extra time of a knockout tie", "fn": golden_goal},
     {"icon": "👑", "name": "Golden Owner", "blurb": "You own the tournament's top goalscorer", "fn": golden_owner},
     {"icon": "🎩", "name": "Hat-trick Hero", "blurb": "A player on one of your teams scores 3+ in a game", "fn": hat_trick_hero},
     {"icon": "🏹", "name": "Host Hunter", "blurb": "Own a team that beats a 2026 host nation (USA, Canada or Mexico)", "fn": host_hunter},
