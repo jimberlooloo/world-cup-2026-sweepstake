@@ -226,18 +226,25 @@ def render_money(b: dict) -> None:
 
     money: dict[str, float] = {}
     taken: set[str] = set()  # holds a prize already, so out of the running for a smaller one
+    held: dict[str, str] = {}  # player -> the prize keeping them out, for the passed-over note
     settled = []
     # A placing can't cascade — it belongs to whoever owns that team — so it only ever blocks
     # a player from a later, smaller prize. Settle all three before anything else.
     for name, amt, rule, tbd, holders in placings:
         holders = [h for h in holders if h not in taken]
         taken.update(holders)
+        held.update({h: name for h in holders})
         settled.append((name, amt, rule, tbd, holders, []))
     # The rest cascade past anyone with a placing banked or guaranteed by reaching the final.
     for name, amt, rule, tbd, tiers in others:
         holders, passed = _award(tiers, taken | set(finalists))
         taken.update(holders)
+        held.update({h: name for h in holders})
         settled.append((name, amt, rule, tbd, holders, passed))
+
+    def why(p: str) -> str:
+        # A finalist's placing isn't settled yet, but £18-or-£9 is already banked either way.
+        return "in the final" if p in finalists else held.get(p, "a bigger prize")
 
     rows = []
     for name, amt, rule, tbd, holders, passed in settled:
@@ -251,7 +258,8 @@ def render_money(b: dict) -> None:
             line = f'<div class="mn-tbd">{html.escape(rule)} · {html.escape(tbd)}</div>'
         if passed:
             note = ('<div class="mn-pass">↩ passed over: '
-                    f'{", ".join(html.escape(p) for p in passed)} · in line for a bigger prize</div>')
+                    + ", ".join(f'{html.escape(p)} ({html.escape(why(p))})' for p in passed)
+                    + "</div>")
         fav = favourites.get(name)
         if fav:
             # fav is "Team (odds)" — extract team to find owner
