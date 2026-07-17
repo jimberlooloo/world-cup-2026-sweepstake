@@ -131,6 +131,9 @@ MONEY_CSS = """
 .mn-who { color:#9fdcbb; font-size:12px; margin-top:1px; }
 .mn-tbd { color:#5fae86; font-size:12px; font-style:italic; margin-top:1px; }
 .mn-fav { color:#a0c8ff; font-size:11px; display:block; margin-top:2px; }
+.mn-pass { color:#e8a33d; font-size:11px; margin-top:2px; }
+.mny-sub { background:#0c3120; color:#9fdcbb; font-size:11px; padding:5px 12px;
+           border-top:1px solid #1f7a4d33; }
 .lb { border:1px solid #2a2a33; border-radius:10px; background:#15151c;
       margin-bottom:10px; overflow:hidden; }
 .lb-h { background:#1c1c26; color:#9090a0; font-size:10px; font-weight:700;
@@ -154,32 +157,65 @@ def _choc_holders(b: dict) -> list[str]:
     return []
 
 
+def _tiers(scores: dict[str, float]) -> list[list[str]]:
+    """Players grouped into tied tiers, best first. A zero score doesn't place at all."""
+    live = {p: v for p, v in scores.items() if v > 0}
+    return [sorted(p for p, s in live.items() if s == v)
+            for v in sorted(set(live.values()), reverse=True)]
+
+
+def _award(tiers: list[list[str]], taken: set[str]) -> tuple[list[str], list[str]]:
+    """Give a prize to the best tier with someone left, since nobody wins twice.
+
+    Returns (holders, passed_over) — passed_over is everyone ranked at or above the
+    winning tier who was skipped because they already hold a bigger prize.
+    """
+    passed: list[str] = []
+    for tier in tiers:
+        free = [p for p in tier if p not in taken]
+        if free:
+            return free, passed + [p for p in tier if p in taken]
+        passed += tier
+    return [], passed
+
+
 def render_money(b: dict) -> None:
-    """Consolidated 'who's winning' view — current leader of every cash prize plus each
-    player's provisional winnings (ties split the prize; placings stay TBD until decided)."""
+    """Consolidated 'who's winning' view — current holder of every cash prize plus each
+    player's provisional winnings.
+
+    One prize each: prizes are settled biggest-first — the three placings, then the rest —
+    and anyone already holding a bigger one is passed over so the prize cascades to the next
+    player in line. Ties split whatever they land on.
+
+    Once the final is set, both finalists' owners are certain of £18 or £9 even though the
+    match decides which, so they're locked out of the lesser prizes straight away.
+    """
     goals, owner, allocation, status = b["goals"], b["owner"], b["allocation"], b["status"]
     totals = {p: sum(goals.get(t, 0) for t in ts) for p, ts in allocation.items()}
-    gb_top = max(totals.values(), default=0)
-    gb = sorted(p for p, v in totals.items() if v == gb_top and gb_top > 0)
 
     fame_tally, shame_tally = trophies.hall_tallies(b)
 
-    def hall_leaders(t: dict) -> list:
-        return sorted(p for p, c in t.items() if c == max(t.values())) if t else []
-
-    def placed(label: str) -> list:
+    def owners_of(label: str) -> list[str]:
         return sorted({owner[t] for t, s in status.items()
                        if (s or {}).get("label") == label and owner.get(t)})
 
-    # (name, amount, how it's won, what shows until it's decided, current holders)
-    prizes = [
-        ("🥇 Winner", 18, "owner of the team that lifts the cup", "the final decides it", placed("🏆 Champions")),
-        ("🥈 Runner-up", 9, "owner of the runner-up", "the final decides it", placed("🥈 Runner-up")),
-        ("🥉 Third place", 6, "owner of the third-place team", "the 3rd-place game decides it", placed("🥉 Third place")),
-        ("👟 Golden Boot", 6, "3 teams' most combined goals", "no goals yet", gb),
-        ("🌟 Hall of Fame", 6, "most fame trophies", "up for grabs", hall_leaders(fame_tally)),
-        ("🙈 Hall of Shame", 3, "most shame trophies (£3 back)", "up for grabs", hall_leaders(shame_tally)),
-        ("🍫 Chocolate Bar", None, "first to have all 3 teams knocked out", "still teams alive", _choc_holders(b)),
+    # Guaranteed £18 or £9 the moment the final is set — the 3rd-place game isn't a guarantee
+    # of anything, since 4th place pays nothing, so those owners stay in the running.
+    finalists = owners_of("Final")
+    final_tbd = (f'{", ".join(finalists)} · the final decides which'
+                 if len(finalists) == 2 else "the final decides it")
+
+    # (name, amount, how it's won, what shows until it's decided, ranked tiers of candidates)
+    # Order matters: this is the settling order, biggest prize first.
+    placings = [
+        ("🥇 Winner", 18, "owner of the team that lifts the cup", final_tbd, owners_of("🏆 Champions")),
+        ("🥈 Runner-up", 9, "owner of the runner-up", final_tbd, owners_of("🥈 Runner-up")),
+        ("🥉 Third place", 6, "owner of the third-place team", "the 3rd-place game decides it", owners_of("🥉 Third place")),
+    ]
+    others = [
+        ("👟 Golden Boot", 6, "3 teams' most combined goals", "no goals yet", _tiers(totals)),
+        ("🌟 Hall of Fame", 6, "most fame trophies", "up for grabs", _tiers(fame_tally)),
+        ("🙈 Hall of Shame", 3, "most shame trophies (£3 back)", "up for grabs", _tiers(shame_tally)),
     ]
 
     try:
@@ -189,16 +225,33 @@ def render_money(b: dict) -> None:
         favourites = {}
 
     money: dict[str, float] = {}
+    taken: set[str] = set()  # holds a prize already, so out of the running for a smaller one
+    settled = []
+    # A placing can't cascade — it belongs to whoever owns that team — so it only ever blocks
+    # a player from a later, smaller prize. Settle all three before anything else.
+    for name, amt, rule, tbd, holders in placings:
+        holders = [h for h in holders if h not in taken]
+        taken.update(holders)
+        settled.append((name, amt, rule, tbd, holders, []))
+    # The rest cascade past anyone with a placing banked or guaranteed by reaching the final.
+    for name, amt, rule, tbd, tiers in others:
+        holders, passed = _award(tiers, taken | set(finalists))
+        taken.update(holders)
+        settled.append((name, amt, rule, tbd, holders, passed))
+
     rows = []
-    for name, amt, rule, tbd, holders in prizes:
+    for name, amt, rule, tbd, holders, passed in settled:
+        note = ""
         if holders:
-            if amt:
-                for h in holders:
-                    money[h] = money.get(h, 0) + amt / len(holders)
+            for h in holders:
+                money[h] = money.get(h, 0) + amt / len(holders)
             line = (f'<div class="mn-who">{html.escape(rule)} · '
                     f'{", ".join(html.escape(h) for h in holders)}</div>')
         else:
             line = f'<div class="mn-tbd">{html.escape(rule)} · {html.escape(tbd)}</div>'
+        if passed:
+            note = ('<div class="mn-pass">↩ passed over: '
+                    f'{", ".join(html.escape(p) for p in passed)} · in line for a bigger prize</div>')
         fav = favourites.get(name)
         if fav:
             # fav is "Team (odds)" — extract team to find owner
@@ -208,9 +261,16 @@ def render_money(b: dict) -> None:
             fav_html = (f'<span class="mn-fav">🎰 Bookies fav: {html.escape(fav)}{html.escape(owner_str)}</span>')
         else:
             fav_html = ""
-        amt_str = f"£{amt}" if amt else "🍫"
         rows.append(f'<div class="mn-row"><div class="mn-top"><span class="mn-prize">'
-                    f'{name}</span><span class="mn-amt">{amt_str}</span></div>{line}{fav_html}</div>')
+                    f'{name}</span><span class="mn-amt">£{amt}</span></div>{line}{note}{fav_html}</div>')
+
+    # The Chocolate Bar is a booby prize with no cash, so it sits outside the one-prize rule.
+    choc = _choc_holders(b)
+    choc_line = (f'<div class="mn-who">first to have all 3 teams knocked out · '
+                 f'{", ".join(html.escape(h) for h in choc)}</div>' if choc else
+                 '<div class="mn-tbd">first to have all 3 teams knocked out · still teams alive</div>')
+    rows.append('<div class="mn-row"><div class="mn-top"><span class="mn-prize">'
+                f'🍫 Chocolate Bar</span><span class="mn-amt">🍫</span></div>{choc_line}</div>')
 
     def fmt(x: float) -> str:
         return f"£{x:.0f}" if x == int(x) else f"£{x:.2f}"
@@ -226,6 +286,8 @@ def render_money(b: dict) -> None:
     st.markdown(
         MONEY_CSS
         + '<div class="mny"><div class="mny-h">Prizes · current leaders</div>'
+        + '<div class="mny-sub">One prize each — you keep your biggest, and anything else '
+          'passes down to the next player in line.</div>'
         + "".join(rows) + "</div>" + standings,
         unsafe_allow_html=True,
     )
@@ -364,6 +426,8 @@ def _share_text(b: dict) -> str:
 
 # Newest first. Keep generic — no real names, no personal content.
 UPDATES = [
+    ("17 Jul", "💷 One prize each — you keep your biggest, the rest passes down the line"),
+    ("17 Jul", "🥇 Both finalists' owners are now locked in for £18 or £9"),
     ("30 Jun", "🫀 New: Penalty Loser · 📉 Biggest Collapse · 🧺 Colander"),
     ("30 Jun", "🍫 Chocolate Bar: now goes to the first player with all 3 teams out"),
     ("30 Jun", "💀 New shame trophy: Giant Slain — your top-16 team knocked out by a lower side"),

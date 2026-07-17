@@ -6,6 +6,13 @@ race, Fame & Shame trophies, and your slice of the prize pot.
 > 💷 £3 to enter · £48 pot, all paid out as cash:
 > 🥇 £18 · 🥈 £9 · 🥉 £6 (to the team's owner) · 👟 Golden Boot £6 (most combined goals) ·
 > 🌟 Hall of Fame £6 (most trophies) · 🙈 Hall of Shame £3 (most boobies — your money back)
+>
+> **One prize each.** Prizes are settled biggest first — 🥇 🥈 🥉, then the rest — and you keep
+> only your biggest one. Anything else you'd have won passes down to the next player in line
+> (the runner-up on goals, the next player on trophies, and so on). Ties split whatever they
+> land on. Reaching the final guarantees its owner £18 or £9, so both finalists' owners are
+> out of the running for the smaller prizes as soon as the final is set. The 🍫 Chocolate Bar
+> carries no cash, so it sits outside the rule.
 
 ## What you'll see
 Five mobile-first tabs:
