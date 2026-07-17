@@ -134,14 +134,6 @@ MONEY_CSS = """
 .mn-pass { color:#e8a33d; font-size:11px; margin-top:2px; }
 .mny-sub { background:#0c3120; color:#9fdcbb; font-size:11px; padding:5px 12px;
            border-top:1px solid #1f7a4d33; }
-.lb { border:1px solid #2a2a33; border-radius:10px; background:#15151c;
-      margin-bottom:10px; overflow:hidden; }
-.lb-h { background:#1c1c26; color:#9090a0; font-size:10px; font-weight:700;
-        text-transform:uppercase; letter-spacing:1px; padding:5px 12px; }
-.lb-row { display:flex; justify-content:space-between; align-items:center;
-          padding:5px 12px; border-top:1px solid #ffffff0d; font-size:13px; }
-.lb-row .lb-nm { color:#e8e8ef; font-weight:600; }
-.lb-row .lb-ct { font-weight:800; }
 </style>
 """
 
@@ -195,22 +187,30 @@ def render_money(b: dict) -> None:
 
     fame_tally, shame_tally = trophies.hall_tallies(b)
 
-    def owners_of(label: str) -> list[str]:
+    def owners_where(match) -> list[str]:
         return sorted({owner[t] for t, s in status.items()
-                       if (s or {}).get("label") == label and owner.get(t)})
+                       if match((s or {}).get("label") or "") and owner.get(t)})
 
-    # Guaranteed £18 or £9 the moment the final is set — the 3rd-place game isn't a guarantee
-    # of anything, since 4th place pays nothing, so those owners stay in the running.
+    def owners_of(label: str) -> list[str]:
+        return owners_where(lambda l: l == label)
+
+    # Both ties name their two candidates before they're played. Only the final is a promise
+    # of money though — it's £18 or £9 either way, so its owners are locked out of the smaller
+    # prizes below. The 3rd-place game promises nothing (4th pays £0), so those two are named
+    # here but stay in the running for everything else.
     finalists = owners_of("Final")
-    final_tbd = (f'{", ".join(finalists)} · the final decides which'
-                 if len(finalists) == 2 else "the final decides it")
+    third_pair = owners_where(lambda l: "third" in l.lower() and not l.startswith("🥉"))
+
+    def decides(pair: list[str], what: str) -> str:
+        return (f'{", ".join(pair)} · the {what} decides which' if len(pair) == 2
+                else f"the {what} decides it")
 
     # (name, amount, how it's won, what shows until it's decided, ranked tiers of candidates)
     # Order matters: this is the settling order, biggest prize first.
     placings = [
-        ("🥇 Winner", 18, "owner of the team that lifts the cup", final_tbd, owners_of("🏆 Champions")),
-        ("🥈 Runner-up", 9, "owner of the runner-up", final_tbd, owners_of("🥈 Runner-up")),
-        ("🥉 Third place", 6, "owner of the third-place team", "the 3rd-place game decides it", owners_of("🥉 Third place")),
+        ("🥇 Winner", 18, "owner of the team that lifts the cup", decides(finalists, "final"), owners_of("🏆 Champions")),
+        ("🥈 Runner-up", 9, "owner of the runner-up", decides(finalists, "final"), owners_of("🥈 Runner-up")),
+        ("🥉 Third place", 6, "owner of the third-place team", decides(third_pair, "3rd-place game"), owners_of("🥉 Third place")),
     ]
     others = [
         ("👟 Golden Boot", 6, "3 teams' most combined goals", "no goals yet", _tiers(totals)),
@@ -224,7 +224,6 @@ def render_money(b: dict) -> None:
     except Exception:
         favourites = {}
 
-    money: dict[str, float] = {}
     taken: set[str] = set()  # holds a prize already, so out of the running for a smaller one
     held: dict[str, str] = {}  # player -> the prize keeping them out, for the passed-over note
     settled = []
@@ -250,8 +249,6 @@ def render_money(b: dict) -> None:
     for name, amt, rule, tbd, holders, passed in settled:
         note = ""
         if holders:
-            for h in holders:
-                money[h] = money.get(h, 0) + amt / len(holders)
             line = (f'<div class="mn-who">{html.escape(rule)} · '
                     f'{", ".join(html.escape(h) for h in holders)}</div>')
         else:
@@ -280,23 +277,12 @@ def render_money(b: dict) -> None:
     rows.append('<div class="mn-row"><div class="mn-top"><span class="mn-prize">'
                 f'🍫 Chocolate Bar</span><span class="mn-amt">🍫</span></div>{choc_line}</div>')
 
-    def fmt(x: float) -> str:
-        return f"£{x:.0f}" if x == int(x) else f"£{x:.2f}"
-
-    standings = ""
-    if money:
-        ranked = sorted(money.items(), key=lambda kv: (-kv[1], kv[0]))
-        standings = ('<div class="lb"><div class="lb-h">In the money (provisional)</div>'
-                     + "".join(f'<div class="lb-row"><span class="lb-nm">{html.escape(p)}</span>'
-                               f'<span class="lb-ct" style="color:#ffd84d">{fmt(v)}</span></div>'
-                               for p, v in ranked) + "</div>")
-
     st.markdown(
         MONEY_CSS
         + '<div class="mny"><div class="mny-h">Prizes · current leaders</div>'
         + '<div class="mny-sub">One prize each — you keep your biggest, and anything else '
           'passes down to the next player in line.</div>'
-        + "".join(rows) + "</div>" + standings,
+        + "".join(rows) + "</div>",
         unsafe_allow_html=True,
     )
 
